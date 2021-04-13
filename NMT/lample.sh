@@ -13,7 +13,8 @@
 git clone https://github.com/soCromp/UnsupervisedMT
 cd ./UnsupervisedMT/NMT/
 
-#get tools eg moses
+#get tools eg python 3, moses
+module load python/3.7.0
 chmod +x get_tools.sh
 ./get_tools.sh
 
