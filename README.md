@@ -1,5 +1,29 @@
 # Unsupervised Machine Translation
 
+## CRC instructions
+
+Some of these steps are interactive, so they aren't included in the slurm script and you need to do them manually to set them up. They are as follows:
+
+PRIOR to cloning the repository (so files end up in the right place), set up gsutil:
+
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-335.0.0-linux-x86_64.tar.gz
+    tar -zxvf google-cloud-sdk-335.0.0-linux-x86_64.tar.gz
+    ./google-cloud-sdk/install.sh
+    ./google-cloud-sdk/bin/gcloud init  # (project name eternal- )
+    ./google-cloud-sdk/gsutil # this is just to ensure the command is installed and in the right location
+
+Just make sure that this last command doesn't give an error. Then do
+
+    git clone https://github.com/soCromp/UnsupervisedMT
+    cd UnsupervisedMT/NMT
+    ./lample.sh
+
+The last command starts the slurm job. Then you can periodically run `squeue -u <pitt username>` to check the job ID, duration it's running, etc. As it runs, it will print output to a file `lample.out` in the same directory, which you can check too. Once the slurm job starts running (or waiting in queue) you're free to log off CRC.
+
+---
+
+## Repository description
+
 This repository contains the original implementation of the unsupervised PBSMT and NMT models presented in  
 [Phrase-Based & Neural Unsupervised Machine Translation](https://arxiv.org/abs/1804.07755) (EMNLP 2018).
 
@@ -101,7 +125,7 @@ The second method works better when the source and target languages are similar 
 Given binarized monolingual training data, parallel evaluation data, and pretrained cross-lingual embeddings, you can train the model using the following command:
 
 ```
-python main.py 
+python main.py
 
 ## main parameters
 --exp_name test                             # experiment name
