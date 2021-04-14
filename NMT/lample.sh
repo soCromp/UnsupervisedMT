@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 
-#SBATCH --job-name=lample
-#SBATCH --output=lample.out
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --partition=gpu
-#SBATCH --cluster=epiphany
-#SBATCH --time=1-0:00:00
-
-#get repository
-git clone https://github.com/soCromp/UnsupervisedMT
-cd ./UnsupervisedMT/NMT/
+# #SBATCH --job-name=lample
+# #SBATCH --output=lample.out
+# #SBATCH --nodes=1
+# #SBATCH --ntasks=1
+# #SBATCH --cpus-per-task=1
+# #SBATCH --partition=gpu
+# #SBATCH --cluster=epiphany
+# #SBATCH --time=1-0:00:00
 
 #get tools eg python 3, moses
-module load python/3.7.0
+# module load python/3.7.0
 chmod +x get_tools.sh
 ./get_tools.sh
 
