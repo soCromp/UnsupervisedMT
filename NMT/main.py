@@ -14,6 +14,7 @@ from src.utils import bool_flag, initialize_exp
 from src.model import check_mt_model_params, build_mt_model
 from src.trainer import TrainerMT
 from src.evaluator import EvaluatorMT
+from discriminator import Discriminator
 
 
 def get_parser():
@@ -240,6 +241,11 @@ def main(params):
     logger = initialize_exp(params)
     data = load_data(params)
     encoder, decoder, discriminator, lm = build_mt_model(params, data)
+
+    #make wu discriminator
+    dict_src = None#where is it?
+    dict_trg = None#where is it?
+    para_discriminator = Discriminator(params, dict_src, dict_trg, use_cuda=True)
 
     # initialize trainer / reload checkpoint / initialize evaluator
     trainer = TrainerMT(encoder, decoder, discriminator, lm, data, params)

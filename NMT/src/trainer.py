@@ -27,7 +27,7 @@ class TrainerMT(MultiprocessingEventLoop):
 
     VALIDATION_METRICS = []
 
-    def __init__(self, encoder, decoder, discriminator, lm, data, params):
+    def __init__(self, encoder, decoder, discriminator, para_discriminator, lm, data, params):
         """
         Initialize trainer.
         """
@@ -38,6 +38,9 @@ class TrainerMT(MultiprocessingEventLoop):
         self.lm = lm
         self.data = data
         self.params = params
+
+        #wu code additions
+        self.para_discriminator = para_discriminator
 
         # initialization for on-the-fly generation/training
         if len(params.pivo_directions) > 0:
@@ -61,6 +64,11 @@ class TrainerMT(MultiprocessingEventLoop):
         self.dec_optimizer = get_optimizer(decoder.parameters(), params.dec_optimizer)
         self.dis_optimizer = get_optimizer(discriminator.parameters(), params.dis_optimizer) if discriminator is not None else None
         self.lm_optimizer = get_optimizer(lm.parameters(), params.enc_optimizer) if lm is not None else None
+        self.para_dis_optimizer = eval("torch.optim." + params.d_optimizer)(filter(lambda x: x.requires_grad,
+                                                                                    discriminator.parameters()),
+                                                                                    params.d_learning_rate,
+                                                                                    momentum=params.momentum,
+                                                                                    nesterov=True)
 
         # models / optimizers
         self.model_opt = {
@@ -68,6 +76,7 @@ class TrainerMT(MultiprocessingEventLoop):
             'dec': (self.decoder, self.dec_optimizer),
             'dis': (self.discriminator, self.dis_optimizer),
             'lm': (self.lm, self.lm_optimizer),
+            'para_disc': (self.para_discriminator, self.para_dis_optimizer)
         }
 
         # define validation metrics / stopping criterion used for early stopping
