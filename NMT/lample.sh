@@ -9,6 +9,8 @@
 # #SBATCH --cluster=epiphany
 # #SBATCH --time=1-0:00:00
 
+# key: 4/1AY0e-g5Mz_9HklmWp9MIVh9cJCiv-gWS-i14mTz7VA7d5abdNM0dCFTPjfY
+
 #get tools eg python 3, moses
 # module load python/3.7.0
 chmod +x get_tools.sh
