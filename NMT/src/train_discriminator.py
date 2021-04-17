@@ -9,16 +9,14 @@ from torch import cuda
 import torch.nn.functional as F
 from torch.utils.data import DataLoader,Dataset
 
-import utils
+import wu_utils
 from meters import AverageMeter
-from discriminator import Discriminator
-# from discriminator2 import Discriminator
-from generator import LSTMModel
+from wu_discriminator import Discriminator
 from disc_dataloader import DatasetProcessing, prepare_training_data
 from disc_dataloader import train_dataloader, eval_dataloader
 
 
-def train_d(args, dataset, generator):
+def train_d(args, dataset):
     logging.basicConfig(
         format='%(asctime)s %(levelname)s: %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S', level=logging.DEBUG)
@@ -38,21 +36,6 @@ def train_d(args, dataset, generator):
     logging_meters['valid_acc']  = AverageMeter()
     logging_meters['update_times'] = AverageMeter()
 
-    # Build model
-    discriminator = Discriminator(args, dataset.src_dict, dataset.dst_dict,  use_cuda=use_cuda)
-
-    # Load generator
-    assert os.path.exists('checkpoints/generator/best_gmodel.pt')
-    generator = LSTMModel(args, dataset.src_dict, dataset.dst_dict, use_cuda=use_cuda)
-    model_dict = generator.state_dict()
-    pretrained_dict = torch.load('checkpoints/generator/best_gmodel.pt')
-    # 1. filter out unnecessary keys
-    pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-    # 2. overwrite entries in the existing state dict
-    model_dict.update(pretrained_dict)
-    # 3. load the new state dict
-    generator.load_state_dict(model_dict)
-
     if use_cuda:
         if torch.cuda.device_count() > 1:
             discriminator = torch.nn.DataParallel(discriminator).cuda()
@@ -65,7 +48,7 @@ def train_d(args, dataset, generator):
         discriminator.cpu()
         generator.cpu()
 
-    criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = torch.nn.CrossEntropyLoss()
 
     # optimizer = eval("torch.optim." + args.d_optimizer)(filter(lambda x: x.requires_grad, discriminator.parameters()),
     #                                                     args.d_learning_rate, momentum=args.momentum, nesterov=True)
@@ -117,12 +100,12 @@ def train_d(args, dataset, generator):
         for i, sample in enumerate(train_loader):
             if use_cuda:
                 # wrap input tensors in cuda tensors
-                sample = utils.make_variable(sample, cuda=use_cuda)
+                sample = wu_utils.make_variable(sample, cuda=use_cuda)
 
             disc_out = discriminator(sample['src_tokens'], sample['trg_tokens'])
 
             loss = criterion(disc_out, sample['labels'])
-            prediction = torch.Sigmoid()(disc_out).round()
+            _, prediction = F.softmax(disc_out, dim=1).topk(1)
             acc = torch.sum(prediction == sample['labels'].unsqueeze(1)).float() / len(sample['labels'])
 
             logging_meters['train_acc'].update(acc.item())
@@ -152,7 +135,7 @@ def train_d(args, dataset, generator):
                 disc_out = discriminator(sample['src_tokens'], sample['trg_tokens'])
 
                 loss = criterion(disc_out, sample['labels'])
-                prediction = torch.Sigmoid()(disc_out).round()
+                _, prediction = F.softmax(disc_out, dim=1).topk(1)
                 acc = torch.sum(prediction == sample['labels'].unsqueeze(1)).float() / len(sample['labels'])
 
                 logging_meters['valid_acc'].update(acc.item())

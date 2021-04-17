@@ -1,8 +1,6 @@
 '''
-
 This code is adapted from Facebook Fairseq-py
 Visit https://github.com/facebookresearch/fairseq-py for more information
-
 '''
 
 from collections import defaultdict
@@ -71,4 +69,3 @@ def set_incremental_state(module, incremental_state, key, value):
     if incremental_state is not None:
         full_key = _get_full_incremental_state_key(module, key)
         incremental_state[full_key] = value
-

@@ -1,8 +1,6 @@
 '''
-
 This code is adapted from Facebook Fairseq-py
 Visit https://github.com/facebookresearch/fairseq-py for more information
-
 '''
 
 import contextlib
@@ -43,6 +41,10 @@ def load_dictionaries(path, src_lang, dst_lang):
     dst_dict = Dictionary.load(os.path.join(path, 'dict.{}.txt'.format(dst_lang)))
     return src_dict, dst_dict
 
+from torch._utils import _accumulate
+from torch import randperm
+
+
 
 def load_dataset(path, load_splits, src=None, dst=None, maxlen=None):
     """Loads specified data splits (e.g., test, train or valid) from the
@@ -53,8 +55,9 @@ def load_dataset(path, load_splits, src=None, dst=None, maxlen=None):
     assert src is not None and dst is not None, 'Source and target languages should be provided'
 
     src_dict, dst_dict = load_dictionaries(path, src, dst)
+    
     dataset = LanguageDatasets(src, dst, src_dict, dst_dict)
-
+    
     # Load dataset from binary files
     def all_splits_exist(src, dst):
         for split in load_splits:
@@ -62,7 +65,7 @@ def load_dataset(path, load_splits, src=None, dst=None, maxlen=None):
             if not os.path.exists(os.path.join(path, filename)):
                 return False
         return True
-
+        
     # infer langcode
     if all_splits_exist(src, dst):
         langcode = '{}-{}'.format(src, dst)
@@ -75,21 +78,25 @@ def load_dataset(path, load_splits, src=None, dst=None, maxlen=None):
         return os.path.join(path, fmt.format(*args))
 
     for split in load_splits:
-        for k in itertools.count():
-            prefix = "{}{}".format(split, k if k > 0 else '')
-            src_path = fmt_path('{}.{}.{}', prefix, langcode, src)
-            dst_path = fmt_path('{}.{}.{}', prefix, langcode, dst)
+        prefix = split
+        src_path = fmt_path('{}.{}.{}', prefix, langcode, src)
+        dst_path = fmt_path('{}.{}.{}', prefix, langcode, dst)
 
-            if not IndexedInMemoryDataset.exists(src_path):
-                break
+        if not IndexedInMemoryDataset.exists(src_path):
+            break
 
-            dataset.splits[prefix] = LanguagePairDataset(
-                IndexedInMemoryDataset(src_path),
-                IndexedInMemoryDataset(dst_path),
-                pad_idx=dataset.src_dict.pad(),
-                eos_idx=dataset.src_dict.eos(),
-                maxlen=maxlen
-            )
+        dataset.splits[prefix] = LanguagePairDataset(
+            IndexedInMemoryDataset(src_path),
+            IndexedInMemoryDataset(dst_path),
+            pad_idx=dataset.src_dict.pad(),
+            eos_idx=dataset.src_dict.eos(),
+            maxlen=maxlen
+        )
+    # lengths = [50000, len(dataset.splits['train'])-50000]
+
+    # dataset.splits['train']  = random_split(dataset.splits['train'],lengths)[0]
+    # print(type(dataset.splits['train']))
+
 
     return dataset
 
@@ -109,8 +116,6 @@ def load_raw_text_dataset(path, load_splits, src=None, dst=None, maxlen=None):
     for split in load_splits:
         src_path = os.path.join(path, '{}.{}'.format(split, src))
         dst_path = os.path.join(path, '{}.{}'.format(split, dst))
-        #print(f"Data path: {src_path}, {src_dict}")
-        #print(f"Data2 path: {dst_path}, {dst_dict}")
         dataset.splits[split] = LanguagePairDataset(
             IndexedRawTextDataset(src_path, src_dict),
             IndexedRawTextDataset(dst_path, dst_dict),
@@ -194,8 +199,6 @@ class LanguagePairDataset(torch.utils.data.Dataset):
         self.pad_idx = pad_idx
         self.eos_idx = eos_idx
         self.maxlen = maxlen
-        #print("Inside constructor")
-        #print(src[0])
 
     def __getitem__(self, i):
         # subtract 1 for 0-based indexing
@@ -211,7 +214,6 @@ class LanguagePairDataset(torch.utils.data.Dataset):
         return len(self.src)
 
     def collater(self, samples):
-        #print("Collater called")
         return LanguagePairDataset.collate(samples, self.pad_idx, self.eos_idx, self.maxlen)
 
     @staticmethod
@@ -219,17 +221,11 @@ class LanguagePairDataset(torch.utils.data.Dataset):
         if len(samples) == 0:
             return {}
         def merge(key, left_pad, move_eos_to_beginning=False):
-            #print("Calling merge")
-            #print(samples)
-            #print(pad_idx, eos_idx)
-            #print([s[key].shape for s in samples])
-            #print([s[key] for s in samples if s[key].size(0) <= maxlen])
             return LanguagePairDataset.collate_tokens(
                 [s[key] for s in samples],
                 pad_idx, eos_idx, left_pad, move_eos_to_beginning, maxlen
             )
 
-        #
         id = torch.LongTensor([s['id'] for s in samples])
         src_tokens = merge('source', left_pad=LanguagePairDataset.LEFT_PAD_SOURCE)
         target = merge('target', left_pad=LanguagePairDataset.LEFT_PAD_TARGET)
@@ -261,17 +257,12 @@ class LanguagePairDataset(torch.utils.data.Dataset):
         }
 
     @staticmethod
-    def collate_tokens(values, pad_idx, eos_idx, left_pad, move_eos_to_beginning=False, maxlen=None):
+    def collate_tokens(values, pad_idx, eos_idx, left_pad, move_eos_to_beginning=False, maxlen=None):        
         if maxlen is not None:
-            #print("collate_tokens: v", values[0])
-            #print("collate_tokens: v.size(0)", values[0].size(0))
-            #print("collate_tokens: max size", max(v.size(0) for v in values))
-            #print("Before collate assertion\n", torch.cuda.memory_summary(device=None, abbreviated=False))
-            assert max(v.size(0) for v in values) <= maxlen
-        size = max(v.size(0) for v in values) if maxlen is None else maxlen
-        #print(f"printing size: {size}")
+            if not max([v.size(0) for v in values]) <= maxlen:
+                maxlen = max([v.size(0) for v in values])
+        size = max([v.size(0) for v in values]) if maxlen is None else maxlen
         res = values[0].new(len(values), size).fill_(pad_idx)
-        #print("Before collate assignment\n", torch.cuda.memory_summary(device=None, abbreviated=False))
 
         def copy_tensor(src, dst):
             assert dst.numel() == src.numel()
@@ -289,6 +280,30 @@ class LanguagePairDataset(torch.utils.data.Dataset):
                 copy_tensor(v, res[i][:len(v)])
         return res
 
+class Subset(LanguagePairDataset):
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+
+    def __getitem__(self, idx):
+        return self.dataset[self.indices[idx]]
+
+    def __len__(self):
+        return len(self.indices)
+
+def random_split(dataset, lengths):
+    """
+    Randomly split a dataset into non-overlapping new datasets of given lengths
+    ds
+    Arguments:
+        dataset (Dataset): Dataset to be split
+        lengths (iterable): lengths of splits to be produced
+    """
+    if sum(lengths) != len(dataset):
+        raise ValueError("Sum of input lengths does not equal the length of the input dataset!")
+
+    indices = randperm(sum(lengths))
+    return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(_accumulate(lengths), lengths)]
 
 def _valid_size(src_size, dst_size, max_positions):
     if isinstance(max_positions, numbers.Number):
