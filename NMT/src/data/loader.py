@@ -12,6 +12,7 @@ import torch
 from ..utils import create_word_masks
 from .dataset import MonolingualDataset, ParallelDataset
 from .dictionary import EOS_WORD, PAD_WORD, UNK_WORD, SPECIAL_WORD, SPECIAL_WORDS
+import data as wuloader
 
 
 logger = getLogger()
@@ -304,6 +305,34 @@ def load_mono_data(params, data):
     logger.info('')
 
 
+def load_wu_data(params, data):
+    # Load dataset
+    splits = ['train', 'valid']
+    if wuloader.has_binary_files(params.wu_data, splits):
+        print("Loading bin dataset")
+        dataset = wuloader.load_dataset(
+            params.wu_data, splits, params.src_lang, params.trg_lang,
+            params.fixed_max_len)
+        # args.data, splits, args.src_lang, args.trg_lang)
+    else:
+        print(f"Loading raw text dataset {params.wu_data}")
+        dataset = wuloader.load_raw_text_dataset(
+            params.wu_data, splits, params.src_lang, params.trg_lang,
+            params.fixed_max_len)
+        # args.data, splits, args.src_lang, args.trg_lang)
+    if params.src_lang is None or params.trg_lang is None:
+        # record inferred languages in args, so that it's saved in checkpoints
+        params.src_lang, params.trg_lang = dataset.src, dataset.dst
+        print('| [{}] dictionary: {} types'.format(dataset.src,
+                                                   len(dataset.src_dict)))
+        print('| [{}] dictionary: {} types'.format(dataset.dst,
+                                                   len(dataset.dst_dict)))
+    for split in splits:
+        print('| {} {} {} examples'.format(params.wu_data, split,
+                                           len(dataset.splits[split])))
+    data['wu'] = dataset
+
+
 def check_all_data_params(params):
     """
     Check datasets parameters.
@@ -487,8 +516,9 @@ def load_data(params, mono_only=False):
         - mono (dictionary of monolingual datasets (train, valid, test))
         - para (dictionary of parallel datasets (train, valid, test))
         - back (dictionary of parallel datasets (train only))
+        - wu ()
     """
-    data = {'dico': {}, 'mono': {}, 'para': {}, 'back': {}}
+    data = {'dico': {}, 'mono': {}, 'para': {}, 'back': {}, 'wu': {}}
 
     if not mono_only:
 
