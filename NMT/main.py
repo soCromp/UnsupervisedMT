@@ -8,18 +8,19 @@
 import time
 import json
 import argparse
-import options
+import src.options
 from collections import OrderedDict
 
 from src.data.loader import check_all_data_params, load_data
 from src.utils import bool_flag, initialize_exp
 from src.model import check_mt_model_params, build_mt_model
-from src.wu_discriminator import Discriminator as Wu_Discriminator
+from src.model.wu_discriminator import Discriminator as Wu_Discriminator
 from src.trainer import TrainerMT
 from src.evaluator import EvaluatorMT
 
 parser = argparse.ArgumentParser(description="Driver program for CS1678 Failed Project :(")
 
+print("Processing lample args")
 #lample - load args
 options.add_parse_parameters_args(parser)
 options.add_autoencoder_parameters_args(parser)
@@ -33,6 +34,7 @@ options.add_reload_models_args(parser)
 options.add_freeze_network_paramters_args(parser)
 options.add_evaluation_args(parser)
 
+print("Processing wu args")
 # Wu - Load args
 options.add_general_args(parser)
 options.add_dataset_args(parser)
@@ -42,6 +44,8 @@ options.add_checkpoint_args(parser)
 options.add_generator_model_args(parser)
 options.add_discriminator_model_args(parser)
 options.add_generation_args(parser)
+
+print("Done processing args")
 
 def train_g(params, encoder, decoder, discriminator, lm, trainer, evaluator):
     # check checkpoints saving path

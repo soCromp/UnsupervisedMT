@@ -240,7 +240,6 @@ def add_evaluation_args(parser):
                         help="Beam width (<= 0 means greedy)")
     parser.add_argument("--length_penalty", type=float, default=1.0,
                         help="Length penalty: <1.0 favors shorter, >1.0 favors longer sentences")
-    return parser
 
 #################################################################################################
 #                                       Wu Options                                              #
@@ -249,7 +248,6 @@ def add_evaluation_args(parser):
 def add_general_args(parser):
     parser.add_argument("--wu_seed", default=1, type=int,
                         help="Random seed. (default=1)")
-    return parser
 
 def add_dataset_args(parser):
     parser.add_argument("--wu_data", required=True,
@@ -273,8 +271,6 @@ def add_dataset_args(parser):
     parser.add_argument('--prepare-dis-batch-size', type=int, default=128, metavar='N',
                         help='batch size for preparing discriminator training')
 
-    return parser
-
 def add_distributed_training_args(parser):
     parser.add_argument('--distributed-world-size', type=int, metavar='N',
                        default=torch.cuda.device_count(),
@@ -283,8 +279,6 @@ def add_distributed_training_args(parser):
                        help='rank of the current worker')
     parser.add_argument("--gpuid", default=[], nargs='+', type=int,
                         help="ID of gpu device to use. Empty implies cpu usage.")
-
-    return parser
 
 def add_optimization_args(parser):
     parser.add_argument('--max-epoch', '--me', default=0, type=int, metavar='N',
@@ -327,8 +321,6 @@ def add_optimization_args(parser):
                        help='normalize gradients by the number of sentences in a batch'
                             ' (default is to normalize by number of tokens)')
 
-    return parser
-
 
 def add_checkpoint_args(parser):
     parser.add_argument("--model_file", help="Location to dump the models.")
@@ -357,14 +349,12 @@ def add_generator_model_args(parser):
                         help='dropout probability')
     parser.add_argument('--bidirectional', default=False, type=bool,
                        help='unidirectional or bidirectional encoder')
-    return parser
 
 def add_discriminator_model_args(parser):
     parser.add_argument('--fixed-max-len', default=50, type=int,
                        help='the max length the discriminator can hold')
     parser.add_argument('--d-sample-size', default=5000, type=int,
                        help='how many data used to pretrain d in one epoch')
-    return parser
 
 def add_generation_args(parser):
     parser.add_argument('--beam', default=5, type=int, metavar='N',
@@ -391,5 +381,3 @@ def add_generation_args(parser):
                         help='unknown word penalty: <0 produces more unks, >0 produces fewer')
     parser.add_argument('--replace-unk', nargs='?', const=True, default=None,
                         help='perform unknown replacement (optionally with alignment dictionary)')
-
-    return parser
