@@ -528,6 +528,9 @@ def load_data(params, mono_only=False):
         # back-parallel datasets
         load_back_data(params, data)
 
+        # load wu data
+        load_wu_data(params, data)
+
     # monolingual datasets
     load_mono_data(params, data)
 
