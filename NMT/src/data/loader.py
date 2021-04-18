@@ -353,6 +353,7 @@ def check_all_data_params(params):
         assert all(lang in params.langs for lang in params.mono_dataset.keys())
         assert all(len(v.split(',')) == 3 for v in params.mono_dataset.values())
         params.mono_dataset = {k: tuple(v.split(',')) for k, v in params.mono_dataset.items()}
+        print(f"params.mono_dataset.values(): {params.mono_dataset.values()}")
         assert all(all(((i > 0 and path == '') or os.path.isfile(path)) for i, path in enumerate(paths))
                    for paths in params.mono_dataset.values())
 
@@ -367,6 +368,9 @@ def check_all_data_params(params):
         assert lang1 < lang2 and lang1 in params.langs and lang2 in params.langs
         assert train_path == '' or os.path.isfile(train_path.replace('XX', lang1))
         assert train_path == '' or os.path.isfile(train_path.replace('XX', lang2))
+        print(f"valid_path.replace('XX', lang1): {os.path.isfile(valid_path.replace('XX', lang1))}, \
+            {os.path.isfile(valid_path.replace('XX', lang2))}, {os.path.isfile(test_path.replace('XX', lang1))}, \
+            {os.path.isfile(test_path.replace('XX', lang2))}")
         assert os.path.isfile(valid_path.replace('XX', lang1))
         assert os.path.isfile(valid_path.replace('XX', lang2))
         assert os.path.isfile(test_path.replace('XX', lang1))
