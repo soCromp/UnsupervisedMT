@@ -1,7 +1,9 @@
 import pickle
+import os
+import sys
 
 #with open("iwslt14.tokenized.de-en/tmp/train.tags.de-en.tok.en", "r") as file:
-with open("../data/iwslt14.tokenized.de-en/vocab.en.pkl", "rb") as file, open("../data/iwslt14.tokenized.de-en/dict.en.txt", "w") as dictfile:
+with open(os.path.join(sys.argv[1], "vocab.en.pkl"), "rb") as file, open(os.path.join(sys.argv[1], "dict.en.txt"), "w") as dictfile:
 	data = pickle.load(file)
 	for key in data:
 		dictfile.write(f"{key} {data[key]}\n")
@@ -10,7 +12,7 @@ with open("../data/iwslt14.tokenized.de-en/vocab.en.pkl", "rb") as file, open(".
 #print(str(data))
 #print(data)
 
-with open("../data/iwslt14.tokenized.de-en/vocab.de.pkl", "rb") as file, open("../data/iwslt14.tokenized.de-en/dict.de.txt", "w") as dictfile:
+with open(os.path.join(sys.argv[1], "vocab.de.pkl"), "rb") as file, open(os.path.join(sys.argv[1], "dict.de.txt"), "w") as dictfile:
 	data = pickle.load(file)
 	for key in data:
 		dictfile.write(f"{key} {data[key]}\n")

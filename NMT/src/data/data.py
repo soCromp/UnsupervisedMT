@@ -12,8 +12,8 @@ import numpy as np
 import os
 import torch
 import torch.utils.data
-from dictionary import Dictionary
-from indexed_dataset import IndexedDataset, IndexedInMemoryDataset, IndexedRawTextDataset
+from .wu_dictionary import Dictionary
+from .indexed_dataset import IndexedDataset, IndexedInMemoryDataset, IndexedRawTextDataset
 
 
 def has_binary_files(data_dir, splits):

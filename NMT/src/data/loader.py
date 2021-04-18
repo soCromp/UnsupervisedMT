@@ -12,7 +12,8 @@ import torch
 from ..utils import create_word_masks
 from .dataset import MonolingualDataset, ParallelDataset
 from .dictionary import EOS_WORD, PAD_WORD, UNK_WORD, SPECIAL_WORD, SPECIAL_WORDS
-import data as wuloader
+#import data as wuloader
+from .data import has_binary_files, load_dataset, load_raw_text_dataset
 
 
 logger = getLogger()
@@ -308,18 +309,19 @@ def load_mono_data(params, data):
 def load_wu_data(params, data):
     # Load dataset
     splits = ['train', 'valid']
-    if wuloader.has_binary_files(params.wu_data, splits):
+    #print(f"wuloader: {wuloader}")
+    if has_binary_files(params.wu_data, splits):
         print("Loading bin dataset")
-        dataset = wuloader.load_dataset(
+        dataset = load_dataset(
             params.wu_data, splits, params.src_lang, params.trg_lang,
             params.fixed_max_len)
         # args.data, splits, args.src_lang, args.trg_lang)
     else:
         print(f"Loading raw text dataset {params.wu_data}")
-        dataset = wuloader.load_raw_text_dataset(
+        dataset = load_raw_text_dataset(
             params.wu_data, splits, params.src_lang, params.trg_lang,
             params.fixed_max_len)
-        # args.data, splits, args.src_lang, args.trg_lang)
+            # args.data, splits, args.src_lang, args.trg_lang)
     if params.src_lang is None or params.trg_lang is None:
         # record inferred languages in args, so that it's saved in checkpoints
         params.src_lang, params.trg_lang = dataset.src, dataset.dst
@@ -353,7 +355,6 @@ def check_all_data_params(params):
         assert all(lang in params.langs for lang in params.mono_dataset.keys())
         assert all(len(v.split(',')) == 3 for v in params.mono_dataset.values())
         params.mono_dataset = {k: tuple(v.split(',')) for k, v in params.mono_dataset.items()}
-        print(f"params.mono_dataset.values(): {params.mono_dataset.values()}")
         assert all(all(((i > 0 and path == '') or os.path.isfile(path)) for i, path in enumerate(paths))
                    for paths in params.mono_dataset.values())
 
@@ -368,9 +369,6 @@ def check_all_data_params(params):
         assert lang1 < lang2 and lang1 in params.langs and lang2 in params.langs
         assert train_path == '' or os.path.isfile(train_path.replace('XX', lang1))
         assert train_path == '' or os.path.isfile(train_path.replace('XX', lang2))
-        print(f"valid_path.replace('XX', lang1): {os.path.isfile(valid_path.replace('XX', lang1))}, \
-            {os.path.isfile(valid_path.replace('XX', lang2))}, {os.path.isfile(test_path.replace('XX', lang1))}, \
-            {os.path.isfile(test_path.replace('XX', lang2))}")
         assert os.path.isfile(valid_path.replace('XX', lang1))
         assert os.path.isfile(valid_path.replace('XX', lang2))
         assert os.path.isfile(test_path.replace('XX', lang1))

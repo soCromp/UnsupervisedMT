@@ -65,7 +65,7 @@ class TrainerMT(MultiprocessingEventLoop):
         self.dis_optimizer = get_optimizer(discriminator.parameters(), params.dis_optimizer) if discriminator is not None else None
         self.lm_optimizer = get_optimizer(lm.parameters(), params.enc_optimizer) if lm is not None else None
         self.para_dis_optimizer = eval("torch.optim." + params.d_optimizer)(filter(lambda x: x.requires_grad,
-                                                                                    discriminator.parameters()),
+                                                                                    self.para_discriminator.parameters()),
                                                                                     params.d_learning_rate,
                                                                                     momentum=params.momentum,
                                                                                     nesterov=True)
@@ -914,7 +914,7 @@ class TrainerMT(MultiprocessingEventLoop):
         print(f"\n\n======\npadded dec out shape: {padded_dec_out.shape}\n")
 
         #assign probability 1 to the pad index
-        for i in range padded_dec_out.shape[0]:
+        for i in range(padded_dec_out.shape[0]):
             for j in range(decoder_out.shape[1], args.fixed_max_len):
                 padded_dec_out[i,j,pad_idx] = 1
 
