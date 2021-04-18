@@ -11,14 +11,13 @@ import torch
 
 def add_parse_parameters_args(parser):
     # parse parameters
-    parser = argparse.ArgumentParser(description='Language transfer')
     parser.add_argument("--exp_name", type=str, default="",
                         help="Experiment name")
     parser.add_argument("--exp_id", type=str, default="",
                         help="Experiment ID")
     parser.add_argument("--dump_path", type=str, default="./dumped/",
                         help="Experiment dump path")
-    parser.add_argument("--save_periodic", type=bool_flag, default=False,
+    parser.add_argument("--save_periodic", type=bool, default=False,
                         help="Save the model periodically")
     parser.add_argument("--seed", type=int, default=-1,
                         help="Random generator seed (-1 for random)")
@@ -33,23 +32,23 @@ def add_autoencoder_parameters_args(parser):
                         help="Number of layers in the decoders")
     parser.add_argument("--hidden_dim", type=int, default=512,
                         help="Hidden layer size")
-    parser.add_argument("--lstm_proj", type=bool_flag, default=False,
+    parser.add_argument("--lstm_proj", type=bool, default=False,
                         help="Projection layer between decoder LSTM and output layer")
     parser.add_argument("--dropout", type=float, default=0,
                         help="Dropout")
     parser.add_argument("--label-smoothing", type=float, default=0,
                         help="Label smoothing")
-    parser.add_argument("--attention", type=bool_flag, default=True,
+    parser.add_argument("--attention", type=bool, default=True,
                         help="Use an attention mechanism")
     if not parser.parse_known_args()[0].attention:
         parser.add_argument("--enc_dim", type=int, default=512,
                             help="Latent space dimension")
         parser.add_argument("--proj_mode", type=str, default="last",
                             help="Projection mode (proj / pool / last)")
-        parser.add_argument("--init_encoded", type=bool_flag, default=False,
+        parser.add_argument("--init_encoded", type=bool, default=False,
                             help="Initialize the decoder with the encoded state. Append it to each input embedding otherwise.")
     else:
-        parser.add_argument("--transformer", type=bool_flag, default=True,
+        parser.add_argument("--transformer", type=bool, default=True,
                             help="Use transformer architecture + attention mechanism")
         if parser.parse_known_args()[0].transformer:
             parser.add_argument("--transformer_ffn_emb_dim", type=int, default=2048,
@@ -62,24 +61,24 @@ def add_autoencoder_parameters_args(parser):
                                 help="encoder_attention_heads")
             parser.add_argument("--decoder_attention_heads", type=int, default=8,
                                 help="decoder_attention_heads")
-            parser.add_argument("--encoder_normalize_before", type=bool_flag, default=False,
+            parser.add_argument("--encoder_normalize_before", type=bool, default=False,
                                 help="encoder_normalize_before")
-            parser.add_argument("--decoder_normalize_before", type=bool_flag, default=False,
+            parser.add_argument("--decoder_normalize_before", type=bool, default=False,
                                 help="decoder_normalize_before")
         else:
-            parser.add_argument("--input_feeding", type=bool_flag, default=False,
+            parser.add_argument("--input_feeding", type=bool, default=False,
                                 help="Input feeding")
-            parser.add_argument("--share_att_proj", type=bool_flag, default=False,
+            parser.add_argument("--share_att_proj", type=bool, default=False,
                                 help="Share attention projetion layer")
-    parser.add_argument("--share_lang_emb", type=bool_flag, default=False,
+    parser.add_argument("--share_lang_emb", type=bool, default=False,
                         help="Share embedding layers between languages (enc / dec / proj)")
-    parser.add_argument("--share_encdec_emb", type=bool_flag, default=False,
+    parser.add_argument("--share_encdec_emb", type=bool, default=False,
                         help="Share encoder embeddings / decoder embeddings")
-    parser.add_argument("--share_decpro_emb", type=bool_flag, default=False,
+    parser.add_argument("--share_decpro_emb", type=bool, default=False,
                         help="Share decoder embeddings / decoder output projection")
-    parser.add_argument("--share_output_emb", type=bool_flag, default=False,
+    parser.add_argument("--share_output_emb", type=bool, default=False,
                         help="Share decoder output embeddings")
-    parser.add_argument("--share_lstm_proj", type=bool_flag, default=False,
+    parser.add_argument("--share_lstm_proj", type=bool, default=False,
                         help="Share projection layer between decoder LSTM and output layer)")
     parser.add_argument("--share_enc", type=int, default=0,
                         help="Number of layers to share in the encoders")
@@ -107,7 +106,7 @@ def add_discriminator_parameters_args(parser):
                         help="Clip discriminator weights (0 to disable)")
     parser.add_argument("--dis_smooth", type=float, default=0,
                         help="GAN smooth predictions")
-    parser.add_argument("--dis_input_proj", type=bool_flag, default=True,
+    parser.add_argument("--dis_input_proj", type=bool, default=True,
                         help="Feed the discriminator with the projected output (attention only)")
 
 def add_dataset_args(parser):
@@ -155,9 +154,9 @@ def add_training_steps_args(parser):
                         help="Number of updates between synchronizing params")
     parser.add_argument("--otf_num_processes", type=int, default=30, metavar="N",
                         help="Number of processes to use for OTF generation")
-    parser.add_argument("--otf_update_enc", type=bool_flag, default=True,
+    parser.add_argument("--otf_update_enc", type=bool, default=True,
                         help="Update the encoder during back-translation training")
-    parser.add_argument("--otf_update_dec", type=bool_flag, default=True,
+    parser.add_argument("--otf_update_dec", type=bool, default=True,
                         help="Update the decoder during back-translation training")
 
 def add_language_model_training_args(parser):
@@ -170,16 +169,16 @@ def add_language_model_training_args(parser):
                         help="Number of shared LSTM layers in the encoder")
     parser.add_argument("--lm_share_dec", type=int, default=0,
                         help="Number of shared LSTM layers in the decoder")
-    parser.add_argument("--lm_share_emb", type=bool_flag, default=False,
+    parser.add_argument("--lm_share_emb", type=bool, default=False,
                         help="Share language model lookup tables")
-    parser.add_argument("--lm_share_proj", type=bool_flag, default=False,
+    parser.add_argument("--lm_share_proj", type=bool, default=False,
                         help="Share language model projection layers")
 
 def add_training_parameters_args(parser):
     # training parameters
     parser.add_argument("--batch_size", type=int, default=32,
                         help="Batch size")
-    parser.add_argument("--group_by_size", type=bool_flag, default=True,
+    parser.add_argument("--group_by_size", type=bool, default=True,
                         help="Sort sentences by size during the training")
     parser.add_argument("--lambda_xe_mono", type=str, default="0",
                         help="Cross-entropy reconstruction coefficient (autoencoding)")
@@ -212,29 +211,27 @@ def add_reload_models_args(parser):
     # reload models
     parser.add_argument("--pretrained_emb", type=str, default="",
                         help="Reload pre-trained source and target word embeddings")
-    parser.add_argument("--pretrained_out", type=bool_flag, default=False,
+    parser.add_argument("--pretrained_out", type=bool, default=False,
                         help="Pretrain the decoder output projection matrix")
     parser.add_argument("--reload_model", type=str, default="",
                         help="Reload a pre-trained model")
-    parser.add_argument("--reload_enc", type=bool_flag, default=False,
+    parser.add_argument("--reload_enc", type=bool, default=False,
                         help="Reload a pre-trained encoder")
-    parser.add_argument("--reload_dec", type=bool_flag, default=False,
+    parser.add_argument("--reload_dec", type=bool, default=False,
                         help="Reload a pre-trained decoder")
-    parser.add_argument("--reload_dis", type=bool_flag, default=False,
-                        help="Reload a pre-trained discriminator")
-    parser.add_argument("--reload_dis", type=bool_flag, default=False,
+    parser.add_argument("--reload_dis", type=bool, default=False,
                         help="Reload a pre-trained discriminator")
     
 def add_freeze_network_paramters_args(parser):
     # freeze network parameters
-    parser.add_argument("--freeze_enc_emb", type=bool_flag, default=False,
+    parser.add_argument("--freeze_enc_emb", type=bool, default=False,
                         help="Freeze encoder embeddings")
-    parser.add_argument("--freeze_dec_emb", type=bool_flag, default=False,
+    parser.add_argument("--freeze_dec_emb", type=bool, default=False,
                         help="Freeze decoder embeddings")
 
 def add_evaluation_args(parser):
     # evaluation
-    parser.add_argument("--eval_only", type=bool_flag, default=False,
+    parser.add_argument("--eval_only", type=bool, default=False,
                         help="Only run evaluations")
     parser.add_argument("--beam_size", type=int, default=0,
                         help="Beam width (<= 0 means greedy)")
@@ -249,7 +246,7 @@ def add_general_args(parser):
     parser.add_argument("--wu_seed", default=1, type=int,
                         help="Random seed. (default=1)")
 
-def add_dataset_args(parser):
+def add_wu_dataset_args(parser):
     parser.add_argument("--wu_data", required=True,
                         help="File prefix for training set.")
     parser.add_argument("--src_lang", default="de",
