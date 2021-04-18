@@ -8,7 +8,7 @@
 import time
 import json
 import argparse
-import src.options
+import src.options as options
 from collections import OrderedDict
 
 from src.data.loader import check_all_data_params, load_data
@@ -37,7 +37,7 @@ options.add_evaluation_args(parser)
 print("Processing wu args")
 # Wu - Load args
 options.add_general_args(parser)
-options.add_dataset_args(parser)
+options.add_wu_dataset_args(parser)
 options.add_distributed_training_args(parser)
 options.add_optimization_args(parser)
 options.add_checkpoint_args(parser)
