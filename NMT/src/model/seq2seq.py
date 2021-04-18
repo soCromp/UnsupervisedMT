@@ -418,6 +418,8 @@ def build_seq2seq_model(params, data, cuda=True):
         logger.info("")
     else:
         discriminator = None
+    logger.info("============ Building seq2seq model - Wu Discriminator ...")
+    logger.info("")
 
     # loss function for decoder reconstruction
     loss_fn = []
@@ -451,7 +453,7 @@ def build_seq2seq_model(params, data, cuda=True):
         if data is not None:
             initialize_embeddings(encoder, decoder, params, data)
 
-        # reload encoder / decoder / discriminator
+        # reload encoder / decoder / discriminator / para_discriminator
         if params.reload_model != '':
             assert os.path.isfile(params.reload_model)
             logger.info("Reloading model from %s ..." % params.reload_model)
