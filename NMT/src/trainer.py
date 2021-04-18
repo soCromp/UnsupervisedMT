@@ -919,7 +919,7 @@ class TrainerMT(MultiprocessingEventLoop):
                 padded_dec_out[i,j,pad_idx] = 1
 
 
-        return padded_dec_out, predictions.permute(1,0)
+        return torch.nn.Softmax(dim=2)(padded_dec_out), predictions.permute(1,0)
     
     #policy gradient loss training between encoder/decoder
     #and bilingual discrininator
