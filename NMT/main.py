@@ -48,9 +48,6 @@ options.add_generation_args(parser)
 
 print("Done processing args")
 
-def train_g(params, encoder, decoder, discriminator, lm, trainer, evaluator):
-
-
 def main(params):
     # check parameters
     assert params.exp_name
