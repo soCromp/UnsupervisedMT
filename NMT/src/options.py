@@ -11,7 +11,6 @@ import torch
 
 def add_parse_parameters_args(parser):
     # parse parameters
-    parser = argparse.ArgumentParser(description='Language transfer')
     parser.add_argument("--exp_name", type=str, default="",
                         help="Experiment name")
     parser.add_argument("--exp_id", type=str, default="",

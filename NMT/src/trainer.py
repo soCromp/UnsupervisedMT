@@ -19,8 +19,8 @@ from .model import build_mt_model
 from .multiprocessing_event_loop import MultiprocessingEventLoop
 from .test import test_sharing
 
-from PGLoss import PGLoss
-from wu_utils import AverageMeter
+from .PGLoss import PGLoss
+from .wu_utils import AverageMeter
 
 logger = getLogger()
 

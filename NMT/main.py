@@ -17,7 +17,7 @@ from src.model import check_mt_model_params, build_mt_model
 from src.model.wu_discriminator import Discriminator as Wu_Discriminator
 from src.trainer import TrainerMT
 from src.evaluator import EvaluatorMT
-from discriminator import Discriminator
+from src.model.discriminator import Discriminator
 
 parser = argparse.ArgumentParser(description="Driver program for CS1678 Failed Project :(")
 
@@ -47,6 +47,8 @@ options.add_discriminator_model_args(parser)
 options.add_generation_args(parser)
 
 print("Done processing args")
+
+#logger = initialize_exp(parser.parse_known_args()[0])
 
 def main(params):
     # check parameters
@@ -175,7 +177,8 @@ if __name__ == '__main__':
     ret = parser.parse_known_args()
     options = ret[0]
     if ret[1]:
-        logging.warning("unknown arguments: {0}".format(parser.parse_known_args()[1]))
+        print("unknown arguments: {0}".format(parser.parse_known_args()[1]))
+        #logger.warning("unknown arguments: {0}".format(parser.parse_known_args()[1]))
     #main(options)
     #parser = options.get_parser()
     #params = parser.parse_args()
