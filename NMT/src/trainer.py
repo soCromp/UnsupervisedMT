@@ -907,9 +907,9 @@ class TrainerMT(MultiprocessingEventLoop):
         self.epoch += 1
         self.save_checkpoint()
     
-    def enc_dec_gen(self, args, lang1, lang2, pad_idx, encoder, decoder):
-        lang1_id = params.lang2id[lang1]
-        lang2_id = params.lang2id[lang2]
+    def enc_dec_gen(self, args, lang1, lang2, pad_idx):
+        lang1_id = args.lang2id[lang1]
+        lang2_id = args.lang2id[lang2]
         max_len = 200
 
         (sent1, len1), (sent2, len2) = self.get_batch('encdec_gen', lang1, lang2)
@@ -1047,7 +1047,7 @@ class TrainerMT(MultiprocessingEventLoop):
                 #padded_dec_out, predictions = enc_dec_gen(args, lang1, lang2, sample, pad_idx, encoder, decoder)
 
                 # Run the lample generator on the wu parallel data
-                sys_out_batch, predictions = self.enc_dec_gen(args, lang1, lang2, sample, self.data['wu'].dst_dict.pad(), self.encoder, self.decoder)
+                sys_out_batch, predictions = self.enc_dec_gen(args, lang1, lang2, self.data['wu'].dst_dict.pad())
 
                 out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 * 50) X 6632   
                 
@@ -1079,7 +1079,7 @@ class TrainerMT(MultiprocessingEventLoop):
                 #padded_dec_out, predictions = enc_dec_gen(args, lang1, lang2, sample, pad_idx, encoder, decoder)
 
                 # Run the lample generator on the wu parallel data
-                sys_out_batch, predictions = self.enc_dec_gen(args, lang1, lang2, sample, self.data['wu'].dst_dict.pad(), self.encoder, self.decoder)
+                sys_out_batch, predictions = self.enc_dec_gen(args, lang1, lang2, self.data['wu'].dst_dict.pad())
 
                 out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 X 50) X 6632  
 
