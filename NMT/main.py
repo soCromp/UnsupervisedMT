@@ -17,6 +17,7 @@ from src.model import check_mt_model_params, build_mt_model
 from src.model.wu_discriminator import Discriminator as Wu_Discriminator
 from src.trainer import TrainerMT
 from src.evaluator import EvaluatorMT
+from discriminator import Discriminator
 
 parser = argparse.ArgumentParser(description="Driver program for CS1678 Failed Project :(")
 
@@ -48,11 +49,25 @@ options.add_generation_args(parser)
 print("Done processing args")
 
 def train_g(params, encoder, decoder, discriminator, lm, trainer, evaluator):
-    # check checkpoints saving path
-    if not os.path.exists('checkpoints/generator'):
-        os.makedirs('checkpoints/generator')
 
-    checkpoints_path = 'checkpoints/generator/'
+
+def main(params):
+    # check parameters
+    assert params.exp_name
+    check_all_data_params(params)
+    check_mt_model_params(params)
+
+    # initialize experiment / load data / build model
+    logger = initialize_exp(params)
+    data = load_data(params)
+    encoder, decoder, mono_discriminator, lm = build_mt_model(params, data)
+    para_discriminator = Wu_Discriminator(args, data['wu'].src_dict, data['wu'].dst_dict, use_cuda=cuda)
+
+    # initialize trainer / reload checkpoint / initialize evaluator
+    trainer = TrainerMT(encoder, decoder, mono_discriminator, lm, data, params)
+    trainer.reload_checkpoint()
+    trainer.test_sharing()  # check parameters sharing
+    evaluator = EvaluatorMT(trainer, data, params)
 
     # evaluation mode
     if params.eval_only:
@@ -156,43 +171,6 @@ def train_g(params, encoder, decoder, discriminator, lm, trainer, evaluator):
         trainer.end_epoch(scores)
         trainer.test_sharing()
 
-def main(params):
-    # check parameters
-    assert params.exp_name
-    check_all_data_params(params)
-    check_mt_model_params(params)
-
-    # initialize experiment / load data / build model
-    logger = initialize_exp(params)
-    data = load_data(params)
-    encoder, decoder, mono_discriminator, lm = build_mt_model(params, data)
-    para_discriminator = Wu_Discriminator(args, data['wu'].src_dict, data['wu'].dst_dict, use_cuda=cuda)
-
-    # initialize trainer / reload checkpoint / initialize evaluator
-    trainer = TrainerMT(encoder, decoder, mono_discriminator, lm, data, params)
-    trainer.reload_checkpoint()
-    trainer.test_sharing()  # check parameters sharing
-    evaluator = EvaluatorMT(trainer, data, params)
-
-    train_g(params, encoder, decoder, mono_discriminator, lm, trainer, evaluator)
-
-    train_d(params, data['wu'], generator)
-
-    g_logging_meters = OrderedDict()
-    g_logging_meters['train_loss'] = AverageMeter()
-    g_logging_meters['valid_loss'] = AverageMeter()
-    g_logging_meters['train_acc'] = AverageMeter()
-    g_logging_meters['valid_acc'] = AverageMeter()
-    g_logging_meters['bsz'] = AverageMeter()  # sentences per batch
-
-    d_logging_meters = OrderedDict()
-    d_logging_meters['train_loss'] = AverageMeter()
-    d_logging_meters['valid_loss'] = AverageMeter()
-    d_logging_meters['train_acc'] = AverageMeter()
-    d_logging_meters['valid_acc'] = AverageMeter()
-    d_logging_meters['bsz'] = AverageMeter()  # sentences per batch
-
-    joint_train(params, dataset, generator, discriminator, g_logging_meters, d_logging_meters)
 
 
 if __name__ == '__main__':

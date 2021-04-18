@@ -19,6 +19,8 @@ from .model import build_mt_model
 from .multiprocessing_event_loop import MultiprocessingEventLoop
 from .test import test_sharing
 
+from PGLoss import PGLoss
+from wu_utils import AverageMeter
 
 logger = getLogger()
 
@@ -27,7 +29,7 @@ class TrainerMT(MultiprocessingEventLoop):
 
     VALIDATION_METRICS = []
 
-    def __init__(self, encoder, decoder, discriminator, lm, data, params):
+    def __init__(self, encoder, decoder, discriminator, para_discriminator, lm, data, params):
         """
         Initialize trainer.
         """
@@ -36,6 +38,7 @@ class TrainerMT(MultiprocessingEventLoop):
         self.decoder = decoder
         self.discriminator = discriminator
         self.lm = lm
+        self.para_discriminator = para_discriminator
         self.data = data
         self.params = params
 
@@ -61,6 +64,11 @@ class TrainerMT(MultiprocessingEventLoop):
         self.dec_optimizer = get_optimizer(decoder.parameters(), params.dec_optimizer)
         self.dis_optimizer = get_optimizer(discriminator.parameters(), params.dis_optimizer) if discriminator is not None else None
         self.lm_optimizer = get_optimizer(lm.parameters(), params.enc_optimizer) if lm is not None else None
+        self.para_dis_optimizer = eval("torch.optim." + params.d_optimizer)(filter(lambda x: x.requires_grad,
+                                                                                    discriminator.parameters()),
+                                                                                    params.d_learning_rate,
+                                                                                    momentum=params.momentum,
+                                                                                    nesterov=True)
 
         # models / optimizers
         self.model_opt = {
@@ -68,6 +76,7 @@ class TrainerMT(MultiprocessingEventLoop):
             'dec': (self.decoder, self.dec_optimizer),
             'dis': (self.discriminator, self.dis_optimizer),
             'lm': (self.lm, self.lm_optimizer),
+            "para_dis": (self.para_discriminator, self.para_dis_optimizer)
         }
 
         # define validation metrics / stopping criterion used for early stopping
@@ -882,3 +891,208 @@ class TrainerMT(MultiprocessingEventLoop):
                 exit()
         self.epoch += 1
         self.save_checkpoint()
+    
+    def enc_dec_gen(self, sample, encoder, decoder):
+        lang1_id = ''  # todo
+        lang2_id = ''
+        max_len = 200
+
+        sent1, len1 = batch
+        sent1 = sent1.cuda()
+        encoded = model.encoder(sent1, len1, lang1_id)
+        sent2, lengths, one_hot = model.decoder.generate(encoded, lang2_id, max_len=max_len)
+
+        #TODO: permute dimensions of sn
+
+        return sys_out_batch, predictions
+    
+    #policy gradient loss training between encoder/decoder
+    #and bilingual discrininator
+    def joint_train(self, args):
+        g_logging_meters = OrderedDict()
+        g_logging_meters['train_loss'] = AverageMeter()
+        g_logging_meters['valid_loss'] = AverageMeter()
+        g_logging_meters['train_acc'] = AverageMeter()
+        g_logging_meters['valid_acc'] = AverageMeter()
+        g_logging_meters['bsz'] = AverageMeter()  # sentences per batch
+
+        d_logging_meters = OrderedDict()
+        d_logging_meters['train_loss'] = AverageMeter()
+        d_logging_meters['valid_loss'] = AverageMeter()
+        d_logging_meters['train_acc'] = AverageMeter()
+        d_logging_meters['valid_acc'] = AverageMeter()
+        d_logging_meters['bsz'] = AverageMeter()  # sentences per batch
+
+        # Set model parameters
+        args.encoder_embed_dim = 1000
+        args.encoder_layers = 2 # 4
+        args.encoder_dropout_out = 0
+        args.decoder_embed_dim = 1000
+        args.decoder_layers = 2 # 4
+        args.decoder_out_embed_dim = 1000
+        args.decoder_dropout_out = 0
+        args.bidirectional = False
+
+        #get the dataset we will be using
+        dataset = self.data['wu']
+
+        #fetch disciminator and optimizer
+        discriminator, d_optimizer = self.model_opt['para_dis']
+
+        # define loss function
+        g_criterion = torch.nn.NLLLoss(ignore_index=dataset.dst_dict.pad(),reduction='sum')
+        d_criterion = torch.nn.BCELoss()
+        pg_criterion = PGLoss(ignore_index=dataset.dst_dict.pad(), size_average=True,reduce=True)
+
+        # fix discriminator word embedding (as Wu et al. do)
+        for p in discriminator.embed_src_tokens.parameters():
+            p.requires_grad = False
+        for p in discriminator.embed_trg_tokens.parameters():
+            p.requires_grad = False
+
+        discriminator.train()
+        self.encoder.train()
+        self.decoder.train()
+
+        # start joint training
+        best_dev_loss = math.inf
+        num_update = 0
+        # main training loop
+        for epoch_i in range(1, args.epochs + 1):
+            logging.info("At {0}-th epoch.".format(epoch_i))
+
+            seed = args.seed + epoch_i
+            torch.manual_seed(seed)
+
+            max_positions_train = (args.fixed_max_len, args.fixed_max_len)
+
+            # Initialize dataloader, starting at batch_offset
+            trainloader = dataset.train_dataloader(
+                'train',
+                max_tokens=args.max_tokens,
+                max_sentences=args.joint_batch_size,
+                max_positions=max_positions_train,
+                # seed=seed,
+                epoch=epoch_i,
+                sample_without_replacement=args.sample_without_replacement,
+                sort_by_source_size=(epoch_i <= args.curriculum),
+                shard_id=args.distributed_rank,
+                num_shards=args.distributed_world_size,
+            )
+
+            # reset meters
+            for key, val in g_logging_meters.items():
+                if val is not None:
+                    val.reset()
+            for key, val in d_logging_meters.items():
+                if val is not None:
+                    val.reset()
+
+            # set training mode
+            generator.train()
+            discriminator.train()
+            update_learning_rate(num_update, 8e4, args.g_learning_rate, args.lr_shrink, g_optimizer)
+
+            for i, sample in enumerate(trainloader):
+
+                if use_cuda:
+                    # wrap input tensors in cuda tensors
+                    sample = utils.make_variable(sample, cuda=cuda)
+
+                ## part I: use gradient policy method to train the generator
+
+                # use policy gradient training when random.random() > 50%
+                if random.random()  >= 0.5:
+
+                    print("Policy Gradient Training")
+                    
+                    sys_out_batch = generator(sample) # 64 X 50 X 6632
+
+                    out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 * 50) X 6632   
+                    
+                    _,prediction = out_batch.topk(1)
+                    prediction = prediction.squeeze(1) # 64*50 = 3200
+                    prediction = torch.reshape(prediction, sample['net_input']['src_tokens'].shape) # 64 X 50
+                    
+                    with torch.no_grad():
+                        reward = discriminator(sample['net_input']['src_tokens'], prediction) # 64 X 1
+
+                    train_trg_batch = sample['target'] # 64 x 50
+                    
+                    pg_loss = pg_criterion(sys_out_batch, train_trg_batch, reward, use_cuda)
+                    sample_size = sample['target'].size(0) if args.sentence_avg else sample['ntokens'] # 64
+                    logging_loss = pg_loss / math.log(2)
+                    g_logging_meters['train_loss'].update(logging_loss.item(), sample_size)
+                    logging.debug(f"G policy gradient loss at batch {i}: {pg_loss.item():.3f}, lr={g_optimizer.param_groups[0]['lr']}")
+                    g_optimizer.zero_grad()
+                    pg_loss.backward()
+                    torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip_norm)
+                    g_optimizer.step()
+
+                else:
+                    # MLE training
+                    print("MLE Training")
+
+                    sys_out_batch = generator(sample)
+
+                    out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 X 50) X 6632  
+
+                    train_trg_batch = sample['target'].view(-1) # 64*50 = 3200
+
+                    loss = g_criterion(out_batch, train_trg_batch)
+
+                    sample_size = sample['target'].size(0) if args.sentence_avg else sample['ntokens']
+                    nsentences = sample['target'].size(0)
+                    logging_loss = loss.data / sample_size / math.log(2)
+                    g_logging_meters['bsz'].update(nsentences)
+                    g_logging_meters['train_loss'].update(logging_loss, sample_size)
+                    logging.debug(f"G MLE loss at batch {i}: {g_logging_meters['train_loss'].avg:.3f}, lr={g_optimizer.param_groups[0]['lr']}")
+                    g_optimizer.zero_grad()
+                    loss.backward()
+                    # all-reduce grads and rescale by grad_denom
+                    for p in generator.parameters():
+                        if p.requires_grad:
+                            p.grad.data.div_(sample_size)
+                    torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip_norm)
+                    g_optimizer.step()
+
+                num_update += 1
+
+
+                # part II: train the discriminator
+                bsz = sample['target'].size(0) # batch_size = 64
+            
+                src_sentence = sample['net_input']['src_tokens'] # 64 x max-len i.e 64 X 50
+
+                # now train with machine translation output i.e generator output
+                true_sentence = sample['target'].view(-1) # 64*50 = 3200
+                
+                true_labels = Variable(torch.ones(sample['target'].size(0)).float()) # 64 length vector
+
+                with torch.no_grad():
+                    sys_out_batch = generator(sample) # 64 X 50 X 6632
+
+                out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 X 50) X 6632  
+                    
+                _,prediction = out_batch.topk(1)
+                prediction = prediction.squeeze(1)  #64 * 50 = 6632
+                
+                fake_labels = Variable(torch.zeros(sample['target'].size(0)).float()) # 64 length vector
+
+                fake_sentence = torch.reshape(prediction, src_sentence.shape) # 64 X 50 
+
+                if use_cuda:
+                    fake_labels = fake_labels.cuda()
+                
+                disc_out = discriminator(src_sentence, fake_sentence) # 64 X 1
+                
+                d_loss = d_criterion(disc_out.squeeze(1), fake_labels)
+
+                acc = torch.sum(torch.round(disc_out).squeeze(1) == fake_labels).float() / len(fake_labels)
+
+                d_logging_meters['train_acc'].update(acc)
+                d_logging_meters['train_loss'].update(d_loss)
+                logging.debug(f"D training loss {d_logging_meters['train_loss'].avg:.3f}, acc {d_logging_meters['train_acc'].avg:.3f} at batch {i}")
+                d_optimizer.zero_grad()
+                d_loss.backward()
+                d_optimizer.step()
