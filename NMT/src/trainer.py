@@ -892,7 +892,7 @@ class TrainerMT(MultiprocessingEventLoop):
         self.epoch += 1
         self.save_checkpoint()
     
-    def enc_dec_gen(self, sample, encoder, decoder):
+    def enc_dec_gen(self, args, sample, pad_idx, encoder, decoder):
         lang1_id = ''  # todo
         lang2_id = ''
         max_len = 200
@@ -900,11 +900,26 @@ class TrainerMT(MultiprocessingEventLoop):
         sent1, len1 = batch
         sent1 = sent1.cuda()
         encoded = model.encoder(sent1, len1, lang1_id)
-        sent2, lengths, one_hot = model.decoder.generate(encoded, lang2_id, max_len=max_len)
 
-        #TODO: permute dimensions of sn
+        decoder_out = decoder(encoded, sample["net_input"]["prev_output_tokens"], lang2_id)
 
-        return sys_out_batch, predictions
+        sent2, lengths, one_hot = model.decoder.generate(encoded, lang2_id, max_len=args.fixed_max_len)
+
+        #permute decoder out dimension
+        decoder_out = decoder_out.permute(1,0,2)
+
+        #put in padding
+        padded_dec_out = torch.zeros(decoder_out.shape[0], args.fixed_max_len, decoder_out.shape[2])
+        padded_dec_out[:, :decoder_out.shape[1], :] = decoder_out 
+        print(f"\n\n======\npadded dec out shape: {padded_dec_out.shape}\n")
+
+        #assign probability 1 to the pad index
+        for i in range padded_dec_out.shape[0]:
+            for j in range(decoder_out.shape[1], args.fixed_max_len):
+                padded_dec_out[i,j,pad_idx] = 1
+
+
+        return padded_dec_out, predictions.permute(1,0)
     
     #policy gradient loss training between encoder/decoder
     #and bilingual discrininator
@@ -989,9 +1004,7 @@ class TrainerMT(MultiprocessingEventLoop):
                     val.reset()
 
             # set training mode
-            generator.train()
             discriminator.train()
-            update_learning_rate(num_update, 8e4, args.g_learning_rate, args.lr_shrink, g_optimizer)
 
             for i, sample in enumerate(trainloader):
 
