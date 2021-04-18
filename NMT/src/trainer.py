@@ -892,6 +892,20 @@ class TrainerMT(MultiprocessingEventLoop):
         self.epoch += 1
         self.save_checkpoint()
     
+    def enc_dec_gen(self, sample, encoder, decoder):
+        lang1_id = ''  # todo
+        lang2_id = ''
+        max_len = 200
+
+        sent1, len1 = batch
+        sent1 = sent1.cuda()
+        encoded = model.encoder(sent1, len1, lang1_id)
+        sent2, lengths, one_hot = model.decoder.generate(encoded, lang2_id, max_len=max_len)
+
+        #TODO: permute dimensions of sn
+
+        return sys_out_batch, predictions
+    
     #policy gradient loss training between encoder/decoder
     #and bilingual discrininator
     def joint_train(self, args):
