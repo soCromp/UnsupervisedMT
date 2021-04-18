@@ -9,7 +9,6 @@ import time
 import json
 import argparse
 import src.options as options
-from collections import OrderedDict
 
 from src.data.loader import check_all_data_params, load_data
 from src.utils import bool_flag, initialize_exp
@@ -21,7 +20,6 @@ from src.model.discriminator import Discriminator
 
 parser = argparse.ArgumentParser(description="Driver program for CS1678 Failed Project :(")
 
-print("Processing lample args")
 #lample - load args
 options.add_parse_parameters_args(parser)
 options.add_autoencoder_parameters_args(parser)
@@ -35,7 +33,6 @@ options.add_reload_models_args(parser)
 options.add_freeze_network_paramters_args(parser)
 options.add_evaluation_args(parser)
 
-print("Processing wu args")
 # Wu - Load args
 options.add_general_args(parser)
 options.add_wu_dataset_args(parser)
@@ -45,10 +42,6 @@ options.add_checkpoint_args(parser)
 options.add_generator_model_args(parser)
 options.add_discriminator_model_args(parser)
 options.add_generation_args(parser)
-
-print("Done processing args")
-
-#logger = initialize_exp(parser.parse_known_args()[0])
 
 def main(params):
     # check parameters
@@ -60,10 +53,10 @@ def main(params):
     logger = initialize_exp(params)
     data = load_data(params)
     encoder, decoder, mono_discriminator, lm = build_mt_model(params, data)
-    para_discriminator = Wu_Discriminator(args, data['wu'].src_dict, data['wu'].dst_dict, use_cuda=cuda)
+    para_discriminator = Wu_Discriminator(params, data['wu'].src_dict, data['wu'].dst_dict, use_cuda=(len(params.gpuid) >= 1))
 
     # initialize trainer / reload checkpoint / initialize evaluator
-    trainer = TrainerMT(encoder, decoder, mono_discriminator, lm, data, params)
+    trainer = TrainerMT(encoder, decoder, mono_discriminator, para_discriminator, lm, data, params)
     trainer.reload_checkpoint()
     trainer.test_sharing()  # check parameters sharing
     evaluator = EvaluatorMT(trainer, data, params)
@@ -95,6 +88,14 @@ def main(params):
         trainer.n_sentences = 0
 
         while trainer.n_sentences < params.epoch_size:
+
+            print(f"params.lambda_pg_paradis: {params.lambda_pg_paradis}")
+            print(f"params.para_directions: {params.mono_directions}")
+            # wuple joint training
+            if params.lambda_pg_paradis > 0:
+                lang1 = params.mono_directions[0]
+                lang2 = params.mono_directions[1]
+                trainer.joint_train(params, lang1, lang2, trainer.epoch, logger)
 
             # mono_discriminator training
             for _ in range(params.n_dis):

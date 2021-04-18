@@ -12,7 +12,8 @@ import torch
 from ..utils import create_word_masks
 from .dataset import MonolingualDataset, ParallelDataset
 from .dictionary import EOS_WORD, PAD_WORD, UNK_WORD, SPECIAL_WORD, SPECIAL_WORDS
-import data as wuloader
+#import data as wuloader
+from .data import has_binary_files, load_dataset, load_raw_text_dataset
 
 
 logger = getLogger()
@@ -308,18 +309,19 @@ def load_mono_data(params, data):
 def load_wu_data(params, data):
     # Load dataset
     splits = ['train', 'valid']
-    if wuloader.has_binary_files(params.wu_data, splits):
+    #print(f"wuloader: {wuloader}")
+    if has_binary_files(params.wu_data, splits):
         print("Loading bin dataset")
-        dataset = wuloader.load_dataset(
+        dataset = load_dataset(
             params.wu_data, splits, params.src_lang, params.trg_lang,
             params.fixed_max_len)
         # args.data, splits, args.src_lang, args.trg_lang)
     else:
         print(f"Loading raw text dataset {params.wu_data}")
-        dataset = wuloader.load_raw_text_dataset(
+        dataset = load_raw_text_dataset(
             params.wu_data, splits, params.src_lang, params.trg_lang,
             params.fixed_max_len)
-        # args.data, splits, args.src_lang, args.trg_lang)
+            # args.data, splits, args.src_lang, args.trg_lang)
     if params.src_lang is None or params.trg_lang is None:
         # record inferred languages in args, so that it's saved in checkpoints
         params.src_lang, params.trg_lang = dataset.src, dataset.dst

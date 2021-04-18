@@ -10,7 +10,7 @@ bash prepare-iwslt14.sh
 
 # run the script to shorten all sentences to less than 50 words
 echo running short-sentences.py
-python short-sentences.py iwslt14.tokenized.de-en de-en 30
+python short-sentences.py ../data/iwslt14.tokenized.de-en de-en 30
 
 #taken from: #https://github.com/lisa-groundhog/GroundHog/tree/master/experiments/nmt/preprocess
 
@@ -20,5 +20,5 @@ python preprocess.py -d ../data/iwslt14.tokenized.de-en/vocab.en.pkl -v 30000 -b
 python preprocess.py -d ../data/iwslt14.tokenized.de-en/vocab.de.pkl -v 30000 -b binarized_text.de.pkl ../data/iwslt14.tokenized.de-en/*.de
 
 # convert the pickeled vocab.*.pkl to dict.*.txt in the iwslt data folder
-echo running pickle-to-dict.py
-python pickle-to-dict.py
+echo running pickle-to-dict.py ../data/iwslt14.tokenized.de-en/
+python pickle-to-dict.py ../data/iwslt14.tokenized.de-en/

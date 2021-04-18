@@ -47,7 +47,8 @@ if __name__ == "__main__":
 
 	#data_folder = os.path.join(os.getcwd(), "../data")
 	#data_path = os.path.join(data_folder, args[0])
-	data_path = os.path.join("../data", args[0])
+	#data_path = os.path.join("/data", args[0])
+	data_path = args[0]
 
 	langs = args[1]
 	lang1, lang2 = langs.split("-")
