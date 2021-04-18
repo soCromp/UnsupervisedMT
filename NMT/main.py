@@ -9,7 +9,6 @@ import time
 import json
 import argparse
 import src.options as options
-from collections import OrderedDict
 
 from src.data.loader import check_all_data_params, load_data
 from src.utils import bool_flag, initialize_exp
@@ -89,6 +88,14 @@ def main(params):
         trainer.n_sentences = 0
 
         while trainer.n_sentences < params.epoch_size:
+
+            print(f"params.lambda_pg_paradis: {params.lambda_pg_paradis}")
+            print(f"params.para_directions: {params.mono_directions}")
+            # wuple joint training
+            if params.lambda_pg_paradis > 0:
+                lang1 = params.mono_directions[0]
+                lang2 = params.mono_directions[1]
+                trainer.joint_train(params, lang1, lang2, trainer.epoch, logger)
 
             # mono_discriminator training
             for _ in range(params.n_dis):
