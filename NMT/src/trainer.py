@@ -915,7 +915,7 @@ class TrainerMT(MultiprocessingEventLoop):
 
         decoder_out = self.decoder(encoded, sample['net_input']['prev_output_tokens'], lang2_id)
 
-        sent2, lengths, one_hot = self.decoder.generate(encoded, lang2_id, max_len=args.fixed_max_len)
+        #sent2, lengths, one_hot = self.decoder.generate(encoded, lang2_id, max_len=args.fixed_max_len)
 
         #permute decoder out dimension
         decoder_out = decoder_out.permute(1,0,2)
@@ -931,7 +931,7 @@ class TrainerMT(MultiprocessingEventLoop):
                 padded_dec_out[i,j,pad_idx] = 1
 
 
-        return torch.nn.Softmax(dim=2)(padded_dec_out), sent2.permute(1,0)
+        return torch.nn.Softmax(dim=2)(padded_dec_out)#, sent2.permute(1,0)
     
     #policy gradient loss training between encoder/decoder
     #and bilingual discrininator
@@ -1040,7 +1040,7 @@ class TrainerMT(MultiprocessingEventLoop):
                 #padded_dec_out, predictions = enc_dec_gen(args, lang1, lang2, sample, pad_idx, encoder, decoder)
 
                 # Run the lample generator on the wu parallel data
-                sys_out_batch, predictions = self.enc_dec_gen(args, sample, lang1, lang2, self.data['wu'].dst_dict.pad())
+                sys_out_batch = self.enc_dec_gen(args, sample, lang1, lang2, self.data['wu'].dst_dict.pad())
 
                 out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 * 50) X 6632   
                 
@@ -1072,7 +1072,7 @@ class TrainerMT(MultiprocessingEventLoop):
                 #padded_dec_out, predictions = enc_dec_gen(args, lang1, lang2, sample, pad_idx, encoder, decoder)
 
                 # Run the lample generator on the wu parallel data
-                sys_out_batch, predictions = self.enc_dec_gen(args, sample, lang1, lang2, self.data['wu'].dst_dict.pad())
+                sys_out_batch = self.enc_dec_gen(args, sample, lang1, lang2, self.data['wu'].dst_dict.pad())
 
                 out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 X 50) X 6632  
 
