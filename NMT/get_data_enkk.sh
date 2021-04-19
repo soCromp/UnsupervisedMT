@@ -11,8 +11,8 @@ set -e
 # Data preprocessing configuration
 #
 
-N_MONO=10000000  # number of monolingual sentences for each language
-CODES=60000      # number of BPE codes
+N_MONO=5000000  # number of monolingual sentences for each language
+CODES=50000      # number of BPE codes
 N_THREADS=48     # number of threads in data preprocessing
 N_EPOCHS=0      # number of fastText epochs
 
@@ -53,32 +53,32 @@ FASTTEXT=$FASTTEXT_DIR/fasttext
 
 # files full paths
 SRC_RAW=$MONO_PATH/all.en
-TGT_RAW=$MONO_PATH/all.de
+TGT_RAW=$MONO_PATH/all.kk
 SRC_TOK=$MONO_PATH/all.en.tok
-TGT_TOK=$MONO_PATH/all.de.tok
+TGT_TOK=$MONO_PATH/all.kk.tok
 BPE_CODES=$MONO_PATH/bpe_codes
-CONCAT_BPE=$MONO_PATH/all.en-de.$CODES
+CONCAT_BPE=$MONO_PATH/all.en-kk.$CODES
 SRC_VOCAB=$MONO_PATH/vocab.en.$CODES
-TGT_VOCAB=$MONO_PATH/vocab.de.$CODES
-FULL_VOCAB=$MONO_PATH/vocab.en-de.$CODES
-SRC_VALID=$PARA_PATH/dev/newstest2015-deen-ref.en
-TGT_VALID=$PARA_PATH/dev/newstest2015-deen-src.de
-SRC_TEST=$PARA_PATH/dev/newstest2016-deen-ref.en
-TGT_TEST=$PARA_PATH/dev/newstest2016-deen-src.de
+TGT_VOCAB=$MONO_PATH/vocab.kk.$CODES
+FULL_VOCAB=$MONO_PATH/vocab.en-kk.$CODES
+SRC_VALID=$PARA_PATH/sgm/newstest2019-kken-ref.en
+TGT_VALID=$PARA_PATH/sgm/newstest2019-kken-ref.kk
+SRC_TEST=$PARA_PATH/sgm/newstest2019-enkk-src.en
+TGT_TEST=$PARA_PATH/sgm/newstest2019-enkk-src.kk
 
-WU_TRAIN_SRC_RAW=$PARA_PATH/dev/newstest2018-deen-ref.en
-WU_TRAIN_TGT_RAW=$PARA_PATH/dev/newstest2018-deen-src.de
-WU_VALID_SRC_RAW=$PARA_PATH/dev/newstest2017-deen-ref.en
-WU_VALID_TGT_RAW=$PARA_PATH/dev/newstest2017-deen-src.de
-WU_TEST_SRC_RAW=$PARA_PATH/dev/newstest2017-deen-ref.en
-WU_TEST_TGT_RAW=$PARA_PATH/dev/newstest2017-deen-src.de
+WU_TRAIN_SRC_RAW=$PARA_PATH/dev/newsdev2019-kken-ref.en
+WU_TRAIN_TGT_RAW=$PARA_PATH/dev/newsdev2019-kken-ref.kk
+WU_VALID_SRC_RAW=$PARA_PATH/sgm/newstest2019-kken-ref.en
+WU_VALID_TGT_RAW=$PARA_PATH/sgm/newstest2019-kken-ref.kk
+WU_TEST_SRC_RAW=$PARA_PATH/sgm/newstest2019-enkk-src.en
+WU_TEST_TGT_RAW=$PARA_PATH/sgm/newstest2019-enkk-src.kk
 
 WU_TRAIN_SRC=$WU_PATH/train.en
-WU_TRAIN_TGT=$WU_PATH/train.de
+WU_TRAIN_TGT=$WU_PATH/train.kk
 WU_VALID_SRC=$WU_PATH/valid.en
-WU_VALID_TGT=$WU_PATH/valid.de
+WU_VALID_TGT=$WU_PATH/valid.kk
 WU_TEST_SRC=$WU_PATH/test.en
-WU_TEST_TGT=$WU_PATH/test.de
+WU_TEST_TGT=$WU_PATH/test.kk
 
 #
 # Download monolingual data
@@ -89,28 +89,10 @@ cd $MONO_PATH
 echo "Downloading English files..."
 wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2007.en.shuffled.gz
 wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2008.en.shuffled.gz
-wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2009.en.shuffled.gz
-wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2010.en.shuffled.gz
-# wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2011.en.shuffled.gz
-# wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2012.en.shuffled.gz
-# wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2013.en.shuffled.gz
-# wget -c http://www.statmt.org/wmt15/training-monolingual-news-crawl-v2/news.2014.en.shuffled.v2.gz
-# wget -c http://data.statmt.org/wmt16/translation-task/news.2015.en.shuffled.gz
-# wget -c http://data.statmt.org/wmt17/translation-task/news.2016.en.shuffled.gz
-# wget -c http://data.statmt.org/wmt18/translation-task/news.2017.en.shuffled.deduped.gz
 
-echo "Downloading German files..."
-wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2007.de.shuffled.gz
-wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2008.de.shuffled.gz
-wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2009.de.shuffled.gz
-wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2010.de.shuffled.gz
-# wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2011.de.shuffled.gz
-# wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2012.de.shuffled.gz
-# wget -c http://www.statmt.org/wmt14/training-monolingual-news-crawl/news.2013.de.shuffled.gz
-# wget -c http://www.statmt.org/wmt15/training-monolingual-news-crawl-v2/news.2014.de.shuffled.v2.gz
-# wget -c http://data.statmt.org/wmt16/translation-task/news.2015.de.shuffled.gz
-# wget -c http://data.statmt.org/wmt17/translation-task/news.2016.de.shuffled.gz
-# wget -c http://data.statmt.org/wmt18/translation-task/news.2017.de.shuffled.deduped.gz
+echo "Downloading Kazakh files..."
+if ! [[ -f "$MONO_PATH/news.2019.kk.shuffled.gz" ]]; then gsutil cp gs://data1678/news.2019.kk.shuffled.gz $MONO_PATH; fi
+# wget -c http://data.statmt.org/wmt19/translation-task/wiki/wiki.2018.kk.filtered.gz
 
 # decompress monolingual data
 for FILENAME in news*gz; do
@@ -127,23 +109,23 @@ done
 if ! [[ -f "$SRC_RAW" && -f "$TGT_RAW" ]]; then
   echo "Concatenating monolingual data..."
   cat $(ls news*en* | grep -v gz) | head -n $N_MONO > $SRC_RAW
-  cat $(ls news*de* | grep -v gz) | head -n $N_MONO > $TGT_RAW
+  cat $(ls news*kk* | grep -v gz) | head -n $N_MONO > $TGT_RAW
 fi
 echo "EN monolingual data concatenated in: $SRC_RAW"
-echo "DE monolingual data concatenated in: $TGT_RAW"
+echo "KK monolingual data concatenated in: $TGT_RAW"
 
 # check number of lines
 if ! [[ "$(wc -l < $SRC_RAW)" -eq "$N_MONO" ]]; then echo "ERROR: Number of lines doesn't match! Be sure you have $N_MONO sentences in your EN monolingual data."; exit; fi
-if ! [[ "$(wc -l < $TGT_RAW)" -eq "$N_MONO" ]]; then echo "ERROR: Number of lines doesn't match! Be sure you have $N_MONO sentences in your DE monolingual data."; exit; fi
+if ! [[ "$(wc -l < $TGT_RAW)" -eq "$N_MONO" ]]; then echo "ERROR: Number of lines doesn't match! Be sure you have $N_MONO sentences in your KK monolingual data."; exit; fi
 
 # tokenize data
 if ! [[ -f "$SRC_TOK" && -f "$TGT_TOK" ]]; then
   echo "Tokenize monolingual data..."
   cat $SRC_RAW | $NORM_PUNC -l en | $TOKENIZER -l en -no-escape -threads $N_THREADS > $SRC_TOK
-  cat $TGT_RAW | $NORM_PUNC -l de | $TOKENIZER -l de -no-escape -threads $N_THREADS > $TGT_TOK
+  cat $TGT_RAW | $NORM_PUNC -l ru | $TOKENIZER -l ru -no-escape -threads $N_THREADS > $TGT_TOK
 fi
 echo "EN monolingual data tokenized in: $SRC_TOK"
-echo "DE monolingual data tokenized in: $TGT_TOK"
+echo "KK monolingual data tokenized in: $TGT_TOK"
 
 # learn BPE codes
 if [ ! -f "$BPE_CODES" ]; then
@@ -159,7 +141,7 @@ if ! [[ -f "$SRC_TOK.$CODES" && -f "$TGT_TOK.$CODES" ]]; then
   $FASTBPE applybpe $TGT_TOK.$CODES $TGT_TOK $BPE_CODES
 fi
 echo "BPE codes applied to EN in: $SRC_TOK.$CODES"
-echo "BPE codes applied to DE in: $TGT_TOK.$CODES"
+echo "BPE codes applied to KK in: $TGT_TOK.$CODES"
 
 # extract vocabulary
 if ! [[ -f "$SRC_VOCAB" && -f "$TGT_VOCAB" && -f "$FULL_VOCAB" ]]; then
@@ -169,7 +151,7 @@ if ! [[ -f "$SRC_VOCAB" && -f "$TGT_VOCAB" && -f "$FULL_VOCAB" ]]; then
   $FASTBPE getvocab $SRC_TOK.$CODES $TGT_TOK.$CODES > $FULL_VOCAB
 fi
 echo "EN vocab in: $SRC_VOCAB"
-echo "DE vocab in: $TGT_VOCAB"
+echo "KK vocab in: $TGT_VOCAB"
 echo "Full vocab in: $FULL_VOCAB"
 
 # binarize data
@@ -179,20 +161,22 @@ if ! [[ -f "$SRC_TOK.$CODES.pth" && -f "$TGT_TOK.$CODES.pth" ]]; then
   $UMT_PATH/preprocess.py $FULL_VOCAB $TGT_TOK.$CODES
 fi
 echo "EN binarized data in: $SRC_TOK.$CODES.pth"
-echo "DE binarized data in: $TGT_TOK.$CODES.pth"
+echo "KK binarized data in: $TGT_TOK.$CODES.pth"
 
 
 #
-# Download parallel data (for wu and evaluation only)
+# Download parallel data (for evaluation only)
 #
 
 cd $PARA_PATH
 
 echo "Downloading parallel data..."
 wget -c http://data.statmt.org/wmt19/translation-task/dev.tgz
+wget -c http://data.statmt.org/wmt19/translation-task/test.tgz
 
 echo "Extracting parallel data..."
 tar -xzf dev.tgz
+tar -xzf test.tgz
 
 # check wu and valid and test files are here
 if ! [[ -f "$SRC_VALID.sgm" ]]; then echo "$SRC_VALID.sgm is not found!"; exit; fi
@@ -208,15 +192,15 @@ if ! [[ -f "$WU_TEST_TGT_RAW.sgm" ]]; then echo "$WU_TEST_TGT_RAW.sgm is not fou
 
 echo "Tokenizing wu, valid and test data..."
 $INPUT_FROM_SGM < $SRC_VALID.sgm | $NORM_PUNC -l en | $REM_NON_PRINT_CHAR | $TOKENIZER -l en -no-escape -threads $N_THREADS > $SRC_VALID
-$INPUT_FROM_SGM < $TGT_VALID.sgm | $NORM_PUNC -l de | $REM_NON_PRINT_CHAR | $TOKENIZER -l de -no-escape -threads $N_THREADS > $TGT_VALID
+$INPUT_FROM_SGM < $TGT_VALID.sgm | $NORM_PUNC -l ru | $REM_NON_PRINT_CHAR | $TOKENIZER -l ru -no-escape -threads $N_THREADS > $TGT_VALID
 $INPUT_FROM_SGM < $SRC_TEST.sgm | $NORM_PUNC -l en | $REM_NON_PRINT_CHAR | $TOKENIZER -l en -no-escape -threads $N_THREADS > $SRC_TEST
-$INPUT_FROM_SGM < $TGT_TEST.sgm | $NORM_PUNC -l de | $REM_NON_PRINT_CHAR | $TOKENIZER -l de -no-escape -threads $N_THREADS > $TGT_TEST
+$INPUT_FROM_SGM < $TGT_TEST.sgm | $NORM_PUNC -l ru | $REM_NON_PRINT_CHAR | $TOKENIZER -l ru -no-escape -threads $N_THREADS > $TGT_TEST
 $INPUT_FROM_SGM < $WU_TRAIN_SRC_RAW.sgm | $NORM_PUNC -l en | $REM_NON_PRINT_CHAR | $TOKENIZER -l en -no-escape -threads $N_THREADS > $WU_TRAIN_SRC_RAW
-$INPUT_FROM_SGM < $WU_TRAIN_TGT_RAW.sgm | $NORM_PUNC -l de | $REM_NON_PRINT_CHAR | $TOKENIZER -l de -no-escape -threads $N_THREADS > $WU_TRAIN_TGT_RAW
+$INPUT_FROM_SGM < $WU_TRAIN_TGT_RAW.sgm | $NORM_PUNC -l ru | $REM_NON_PRINT_CHAR | $TOKENIZER -l ru -no-escape -threads $N_THREADS > $WU_TRAIN_TGT_RAW
 $INPUT_FROM_SGM < $WU_VALID_SRC_RAW.sgm | $NORM_PUNC -l en | $REM_NON_PRINT_CHAR | $TOKENIZER -l en -no-escape -threads $N_THREADS > $WU_VALID_SRC_RAW
-$INPUT_FROM_SGM < $WU_VALID_TGT_RAW.sgm | $NORM_PUNC -l de | $REM_NON_PRINT_CHAR | $TOKENIZER -l de -no-escape -threads $N_THREADS > $WU_VALID_TGT_RAW
+$INPUT_FROM_SGM < $WU_VALID_TGT_RAW.sgm | $NORM_PUNC -l ru | $REM_NON_PRINT_CHAR | $TOKENIZER -l ru -no-escape -threads $N_THREADS > $WU_VALID_TGT_RAW
 $INPUT_FROM_SGM < $WU_TEST_SRC_RAW.sgm | $NORM_PUNC -l en | $REM_NON_PRINT_CHAR | $TOKENIZER -l en -no-escape -threads $N_THREADS > $WU_TEST_SRC_RAW
-$INPUT_FROM_SGM < $WU_TEST_TGT_RAW.sgm | $NORM_PUNC -l de | $REM_NON_PRINT_CHAR | $TOKENIZER -l de -no-escape -threads $N_THREADS > $WU_TEST_TGT_RAW
+$INPUT_FROM_SGM < $WU_TEST_TGT_RAW.sgm | $NORM_PUNC -l ru | $REM_NON_PRINT_CHAR | $TOKENIZER -l ru -no-escape -threads $N_THREADS > $WU_TEST_TGT_RAW
 
 echo "Applying BPE to wu, valid and test files..."
 $FASTBPE applybpe $SRC_VALID.$CODES $SRC_VALID $BPE_CODES $SRC_VOCAB
@@ -252,23 +236,23 @@ echo "===== Data summary"
 echo "=== Lample"
 echo "Monolingual training data:"
 echo "    EN: $SRC_TOK.$CODES.pth"
-echo "    DE: $TGT_TOK.$CODES.pth"
+echo "    KK: $TGT_TOK.$CODES.pth"
 echo "Parallel validation data:"
 echo "    EN: $SRC_VALID.$CODES.pth"
-echo "    DE: $TGT_VALID.$CODES.pth"
+echo "    KK: $TGT_VALID.$CODES.pth"
 echo "Parallel test data:"
 echo "    EN: $SRC_TEST.$CODES.pth"
-echo "    DE: $TGT_TEST.$CODES.pth"
+echo "    KK: $TGT_TEST.$CODES.pth"
 echo "=== Wu"
 echo "Train:"
 echo "    EN: $WU_TRAIN_SRC.pth"
-echo "    DE: $WU_TRAIN_TGT.pth"
+echo "    KK: $WU_TRAIN_TGT.pth"
 echo "Valid:"
 echo "    EN: $WU_VALID_SRC.pth"
-echo "    DE: $WU_VALID_TGT.pth"
+echo "    KK: $WU_VALID_TGT.pth"
 echo "Test:"
 echo "    EN: $WU_TEST_SRC.pth"
-echo "    DE: $WU_TEST_TGT.pth"
+echo "    KK: $WU_TEST_TGT.pth"
 echo ""
 
 
