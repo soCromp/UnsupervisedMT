@@ -325,11 +325,11 @@ def add_checkpoint_args(parser):
     parser.add_argument("--model_file", help="Location to dump the models.")
 
 def add_generator_model_args(parser):
-    parser.add_argument('--encoder-embed-dim', default=512, type=int,
+    parser.add_argument('--encoder-embed-dim', default=1000, type=int,
                        help='encoder embedding dimension')
     parser.add_argument('--encoder-layers', default=1, type=int,
                        help='encoder layers [(dim, kernel_size), ...]')
-    parser.add_argument('--decoder-embed-dim', default=512, type=int,
+    parser.add_argument('--decoder-embed-dim', default=1000, type=int,
                        help='decoder embedding dimension')
     parser.add_argument('--decoder-layers', default=1, type=int,
                        help='decoder layers [(dim, kernel_size), ...]')

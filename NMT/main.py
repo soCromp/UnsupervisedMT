@@ -9,7 +9,6 @@ import time
 import json
 import argparse
 import src.options as options
-from collections import OrderedDict
 
 from src.data.loader import check_all_data_params, load_data
 from src.utils import bool_flag, initialize_exp
@@ -54,7 +53,8 @@ def main(params):
     logger = initialize_exp(params)
     data = load_data(params)
     encoder, decoder, mono_discriminator, lm = build_mt_model(params, data)
-    para_discriminator = Wu_Discriminator(params, data['wu'].src_dict, data['wu'].dst_dict, use_cuda=(len(params.gpuid) >= 1))
+    para_discriminator = Wu_Discriminator(params, data['wu'].src_dict, data['wu'].dst_dict, use_cuda=True)
+    para_discriminator.cuda()
 
     # initialize trainer / reload checkpoint / initialize evaluator
     trainer = TrainerMT(encoder, decoder, mono_discriminator, para_discriminator, lm, data, params)
@@ -90,29 +90,42 @@ def main(params):
 
         while trainer.n_sentences < params.epoch_size:
 
+            print(f"params.lambda_pg_paradis: {params.lambda_pg_paradis}")
+            print(f"params.para_directions: {params.mono_directions}")
+            # wuple joint training
+            if params.lambda_pg_paradis > 0:
+                lang1 = params.mono_directions[0]
+                lang2 = params.mono_directions[1]
+                trainer.joint_train(params, lang1, lang2, trainer.epoch, logger)
+
             # mono_discriminator training
             for _ in range(params.n_dis):
+                print(f"===========\n In disc trainer")
                 trainer.discriminator_step()
 
             # language model training
             if params.lambda_lm > 0:
                 for _ in range(params.lm_after):
                     for lang in params.langs:
+                        print(f"===========\n In lm trainer")
                         trainer.lm_step(lang)
 
             # MT training (parallel data)
             if params.lambda_xe_para > 0:
                 for lang1, lang2 in params.para_directions:
+                    print(f"===========\n In parallel trainer")
                     trainer.enc_dec_step(lang1, lang2, params.lambda_xe_para)
 
             # MT training (back-parallel data)
             if params.lambda_xe_back > 0:
                 for lang1, lang2 in params.back_directions:
+                    print(f"===========\n In back trainer")
                     trainer.enc_dec_step(lang1, lang2, params.lambda_xe_back, back=True)
 
             # autoencoder training (monolingual data)
             if params.lambda_xe_mono > 0:
                 for lang in params.mono_directions:
+                    print(f"===========\n In monolingual trainer")
                     trainer.enc_dec_step(lang, lang, params.lambda_xe_mono)
 
             # AE - MT training (on the fly back-translation)

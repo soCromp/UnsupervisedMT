@@ -19,8 +19,19 @@ from .model import build_mt_model
 from .multiprocessing_event_loop import MultiprocessingEventLoop
 from .test import test_sharing
 
+# Wu imports
+import math
+import dill
+import random
+import numpy as np
+from collections import OrderedDict
+
+from torch import cuda
+from torch.autograd import Variable
+
+from .meters import AverageMeter
 from .PGLoss import PGLoss
-from .wu_utils import AverageMeter
+from .wu_utils import AverageMeter, make_variable
 
 logger = getLogger()
 
@@ -792,6 +803,7 @@ class TrainerMT(MultiprocessingEventLoop):
             'dec': self.decoder,
             'dis': self.discriminator,
             'lm': self.lm,
+            'para_dis': self.para_discriminator,
         }, path)
 
     def save_checkpoint(self):
@@ -807,6 +819,7 @@ class TrainerMT(MultiprocessingEventLoop):
             'dec_optimizer': self.dec_optimizer,
             'dis_optimizer': self.dis_optimizer,
             'lm_optimizer': self.lm_optimizer,
+            "para_dis_optimizer": self.para_dis_optimizer,
             'epoch': self.epoch,
             'n_total_iter': self.n_total_iter,
             'best_metrics': self.best_metrics,
@@ -834,6 +847,7 @@ class TrainerMT(MultiprocessingEventLoop):
         self.dec_optimizer = checkpoint_data['dec_optimizer']
         self.dis_optimizer = checkpoint_data['dis_optimizer']
         self.lm_optimizer = checkpoint_data['lm_optimizer']
+        self.para_dis_optimizer = checkpoint_data['para_dis_optimizer']
         self.epoch = checkpoint_data['epoch']
         self.n_total_iter = checkpoint_data['n_total_iter']
         self.best_metrics = checkpoint_data['best_metrics']
@@ -843,6 +857,7 @@ class TrainerMT(MultiprocessingEventLoop):
             'dec': (self.decoder, self.dec_optimizer),
             'dis': (self.discriminator, self.dis_optimizer),
             'lm': (self.lm, self.lm_optimizer),
+            "para_dis": (self.para_discriminator, self.para_dis_optimizer)
         }
         logger.warning('Checkpoint reloaded. Resuming at epoch %i ...' % self.epoch)
 
@@ -892,20 +907,23 @@ class TrainerMT(MultiprocessingEventLoop):
         self.epoch += 1
         self.save_checkpoint()
     
-    def enc_dec_gen(self, args, sample, pad_idx, encoder, decoder):
-        lang1_id = ''  # todo
-        lang2_id = ''
-        max_len = 200
+    def enc_dec_gen(self, args, sample, lang1, lang2, pad_idx):
+        #print("\n\n============== \n\n====================\nin dec/enc gen")
+        lang1_id = args.lang2id[lang1]
+        lang2_id = args.lang2id[lang2]
 
-        sent1, len1 = batch
-        sent1 = sent1.cuda()
-        encoded = model.encoder(sent1, len1, lang1_id)
 
-        decoder_out = decoder(encoded, sample["net_input"]["prev_output_tokens"], lang2_id)
+        #print(f"input shape: {sample['net_input']['src_tokens'].shape}")
+        encoded = self.encoder(sample['net_input']['src_tokens'], sample['net_input']['src_lengths'], lang1_id)
 
-        sent2, lengths, one_hot = model.decoder.generate(encoded, lang2_id, max_len=args.fixed_max_len)
+        decoder_out = self.decoder(encoded, sample['net_input']['prev_output_tokens'], lang2_id)
 
-        #permute decoder out dimension
+        #print(f"original decoder output shape: {decoder_out.shape}")
+
+        #sent2, lengths, one_hot = self.decoder.generate(encoded, lang2_id, max_len=args.fixed_max_len)
+
+        
+        '''#permute decoder out dimension
         decoder_out = decoder_out.permute(1,0,2)
 
         #put in padding
@@ -918,12 +936,13 @@ class TrainerMT(MultiprocessingEventLoop):
             for j in range(decoder_out.shape[1], args.fixed_max_len):
                 padded_dec_out[i,j,pad_idx] = 1
 
-
-        return padded_dec_out, predictions.permute(1,0)
+        '''
+        return  F.log_softmax(decoder_out, dim=2)#, sent2.permute(1,0)
     
     #policy gradient loss training between encoder/decoder
     #and bilingual discrininator
-    def joint_train(self, args):
+    def joint_train(self, args, lang1, lang2, epoch_i, logging):
+        print("==========================\n IN ADVERSERIAL TRAINING\n===================")
         g_logging_meters = OrderedDict()
         g_logging_meters['train_loss'] = AverageMeter()
         g_logging_meters['valid_loss'] = AverageMeter()
@@ -973,139 +992,169 @@ class TrainerMT(MultiprocessingEventLoop):
         best_dev_loss = math.inf
         num_update = 0
         # main training loop
-        for epoch_i in range(1, args.epochs + 1):
-            logging.info("At {0}-th epoch.".format(epoch_i))
+        logging.info("At {0}-th epoch.".format(epoch_i))
 
-            seed = args.seed + epoch_i
-            torch.manual_seed(seed)
+        seed = args.seed + epoch_i
+        torch.manual_seed(seed)
 
-            max_positions_train = (args.fixed_max_len, args.fixed_max_len)
+        max_positions_train = (args.fixed_max_len, args.fixed_max_len)
 
-            # Initialize dataloader, starting at batch_offset
-            trainloader = dataset.train_dataloader(
-                'train',
-                max_tokens=args.max_tokens,
-                max_sentences=args.joint_batch_size,
-                max_positions=max_positions_train,
-                # seed=seed,
-                epoch=epoch_i,
-                sample_without_replacement=args.sample_without_replacement,
-                sort_by_source_size=(epoch_i <= args.curriculum),
-                shard_id=args.distributed_rank,
-                num_shards=args.distributed_world_size,
-            )
+        # Initialize dataloader, starting at batch_offset
+        trainloader = dataset.train_dataloader(
+            'train',
+            max_tokens=args.max_tokens,
+            max_sentences=args.joint_batch_size,
+            max_positions=max_positions_train,
+            # seed=seed,
+            epoch=epoch_i,
+            sample_without_replacement=args.sample_without_replacement,
+            sort_by_source_size=(epoch_i <= args.curriculum),
+            shard_id=args.distributed_rank,
+            num_shards=args.distributed_world_size,
+        )
 
-            # reset meters
-            for key, val in g_logging_meters.items():
-                if val is not None:
-                    val.reset()
-            for key, val in d_logging_meters.items():
-                if val is not None:
-                    val.reset()
+        # reset meters
+        for key, val in g_logging_meters.items():
+            if val is not None:
+                val.reset()
+        for key, val in d_logging_meters.items():
+            if val is not None:
+                val.reset()
 
-            # set training mode
-            discriminator.train()
+        # set training mode
+        discriminator.train()
 
-            for i, sample in enumerate(trainloader):
+        #sample = trainloader[epoch_i]
 
-                if use_cuda:
-                    # wrap input tensors in cuda tensors
-                    sample = utils.make_variable(sample, cuda=cuda)
+        #print(f"Wu_discriminator sample: {sample}")
+        use_cuda = (len(args.gpuid) >= 1)
 
-                ## part I: use gradient policy method to train the generator
+        for i, sample in enumerate(trainloader):
 
-                # use policy gradient training when random.random() > 50%
-                if random.random()  >= 0.5:
+            if use_cuda:
+                # wrap input tensors in cuda tensors
+                sample = make_variable(sample, cuda=cuda)
+                #sample = utils.make_variable(sample, cuda=cuda)
 
-                    print("Policy Gradient Training")
-                    
-                    sys_out_batch = generator(sample) # 64 X 50 X 6632
+            ## part I: use gradient policy method to train the generator
 
-                    out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 * 50) X 6632   
-                    
-                    _,prediction = out_batch.topk(1)
-                    prediction = prediction.squeeze(1) # 64*50 = 3200
-                    prediction = torch.reshape(prediction, sample['net_input']['src_tokens'].shape) # 64 X 50
-                    
-                    with torch.no_grad():
-                        reward = discriminator(sample['net_input']['src_tokens'], prediction) # 64 X 1
+            # use policy gradient training when random.random() > 50%
+            if random.random()  >= 0.5:
 
-                    train_trg_batch = sample['target'] # 64 x 50
-                    
-                    pg_loss = pg_criterion(sys_out_batch, train_trg_batch, reward, use_cuda)
-                    sample_size = sample['target'].size(0) if args.sentence_avg else sample['ntokens'] # 64
-                    logging_loss = pg_loss / math.log(2)
-                    g_logging_meters['train_loss'].update(logging_loss.item(), sample_size)
-                    logging.debug(f"G policy gradient loss at batch {i}: {pg_loss.item():.3f}, lr={g_optimizer.param_groups[0]['lr']}")
-                    g_optimizer.zero_grad()
-                    pg_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip_norm)
-                    g_optimizer.step()
-
-                else:
-                    # MLE training
-                    print("MLE Training")
-
-                    sys_out_batch = generator(sample)
-
-                    out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 X 50) X 6632  
-
-                    train_trg_batch = sample['target'].view(-1) # 64*50 = 3200
-
-                    loss = g_criterion(out_batch, train_trg_batch)
-
-                    sample_size = sample['target'].size(0) if args.sentence_avg else sample['ntokens']
-                    nsentences = sample['target'].size(0)
-                    logging_loss = loss.data / sample_size / math.log(2)
-                    g_logging_meters['bsz'].update(nsentences)
-                    g_logging_meters['train_loss'].update(logging_loss, sample_size)
-                    logging.debug(f"G MLE loss at batch {i}: {g_logging_meters['train_loss'].avg:.3f}, lr={g_optimizer.param_groups[0]['lr']}")
-                    g_optimizer.zero_grad()
-                    loss.backward()
-                    # all-reduce grads and rescale by grad_denom
-                    for p in generator.parameters():
-                        if p.requires_grad:
-                            p.grad.data.div_(sample_size)
-                    torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip_norm)
-                    g_optimizer.step()
-
-                num_update += 1
-
-
-                # part II: train the discriminator
-                bsz = sample['target'].size(0) # batch_size = 64
-            
-                src_sentence = sample['net_input']['src_tokens'] # 64 x max-len i.e 64 X 50
-
-                # now train with machine translation output i.e generator output
-                true_sentence = sample['target'].view(-1) # 64*50 = 3200
+                print("Policy Gradient Training")
                 
-                true_labels = Variable(torch.ones(sample['target'].size(0)).float()) # 64 length vector
+                #sys_out_batch = generator(sample) # 64 X 50 X 6632
+                #padded_dec_out, predictions = enc_dec_gen(args, lang1, lang2, sample, pad_idx, encoder, decoder)
 
+                # Run the lample generator on the wu parallel data
+                #print("\n\n==============\n==============\n CONFUSING SHAPES")
+                sys_out_batch = self.enc_dec_gen(args, sample, lang1, lang2, self.data['wu'].dst_dict.pad())
+
+                #print(f"sys out batch: {sys_out_batch.shape}")
+
+                out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 * 50) X 6632   
+                
+                #print(f"out batch: {out_batch.shape}")
+
+                _,prediction = out_batch.topk(1)
+
+                #print(f"prediction: {prediction.shape}")
+
+                prediction = prediction.squeeze(1) # 64*50 = 3200
+
+
+                #print(f"prediction: {prediction.shape}")
+
+                #prediction = predictions.squeeze(1) # 64*50 = 3200 (NOW JUST 50)
+                prediction = torch.reshape(prediction, sample['net_input']['src_tokens'].shape) # 64 X 50
+                
                 with torch.no_grad():
-                    sys_out_batch = generator(sample) # 64 X 50 X 6632
+                    reward = discriminator(sample['net_input']['src_tokens'], prediction) # 64 X 1
+
+                train_trg_batch = sample['target'] # 64 x 50
+                
+                pg_loss = pg_criterion(sys_out_batch, train_trg_batch, reward, use_cuda)
+                sample_size = sample['target'].size(0) if args.sentence_avg else sample['ntokens'] # 64
+                logging_loss = pg_loss / math.log(2)
+                g_logging_meters['train_loss'].update(logging_loss.item(), sample_size)
+                logging.debug(f"G policy gradient loss at batch {i}: {pg_loss.item():.3f}, lr=n/a")
+                print(f"G policy gradient loss at batch {i}: {pg_loss.item():.3f}, lr=n/a")
+
+                self.zero_grad(['enc', 'dec'])
+                pg_loss.backward()
+                self.update_params(['enc', 'dec'])
+
+            else:
+                # MLE training
+                print("MLE Training")
+
+                #sys_out_batch = generator(sample) # 64 X 50 X 6632
+                #padded_dec_out, predictions = enc_dec_gen(args, lang1, lang2, sample, pad_idx, encoder, decoder)
+
+                # Run the lample generator on the wu parallel data
+                sys_out_batch = self.enc_dec_gen(args, sample, lang1, lang2, self.data['wu'].dst_dict.pad())
 
                 out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 X 50) X 6632  
-                    
-                _,prediction = out_batch.topk(1)
-                prediction = prediction.squeeze(1)  #64 * 50 = 6632
+
+                train_trg_batch = sample['target'].view(-1) # 64*50 = 3200
+
+                loss = g_criterion(out_batch, train_trg_batch)
+
+                sample_size = sample['target'].size(0) if args.sentence_avg else sample['ntokens']
+                nsentences = sample['target'].size(0)
+                logging_loss = loss.data / sample_size / math.log(2)
+                g_logging_meters['bsz'].update(nsentences)
+                g_logging_meters['train_loss'].update(logging_loss, sample_size)
+                logging.debug(f"G MLE loss at batch {i}: {g_logging_meters['train_loss'].avg:.3f}, lr=n/a")
+                print(f"G MLE loss at batch {i}: {g_logging_meters['train_loss'].avg:.3f}, lr=n/a")
+
+
+                self.zero_grad(['enc', 'dec'])
+                loss.backward()
+                self.update_params(['enc', 'dec'])
+
+            num_update += 1
+
+
+            # part II: train the discriminator
+            bsz = sample['target'].size(0) # batch_size = 64
+        
+            src_sentence = sample['net_input']['src_tokens'] # 64 x max-len i.e 64 X 50
+
+            # now train with machine translation output i.e generator output
+            true_sentence = sample['target'].view(-1) # 64*50 = 3200
+            
+            true_labels = Variable(torch.ones(sample['target'].size(0)).float()) # 64 length vector
+
+            with torch.no_grad():
+                sys_out_batch = self.enc_dec_gen(args, sample, lang1, lang2, self.data['wu'].dst_dict.pad()) # 64 X 50 X 6632
+
+            out_batch = sys_out_batch.contiguous().view(-1, sys_out_batch.size(-1)) # (64 X 50) X 6632  
                 
-                fake_labels = Variable(torch.zeros(sample['target'].size(0)).float()) # 64 length vector
+            _,prediction = out_batch.topk(1)
+            prediction = prediction.squeeze(1)  #64 * 50 = 6632
+            
+            fake_labels = Variable(torch.zeros(sample['target'].size(0)).float()) # 64 length vector
 
-                fake_sentence = torch.reshape(prediction, src_sentence.shape) # 64 X 50 
+            fake_sentence = torch.reshape(prediction, src_sentence.shape) # 64 X 50 
 
-                if use_cuda:
-                    fake_labels = fake_labels.cuda()
-                
-                disc_out = discriminator(src_sentence, fake_sentence) # 64 X 1
-                
-                d_loss = d_criterion(disc_out.squeeze(1), fake_labels)
+            if use_cuda:
+                fake_labels = fake_labels.cuda()
+            
+            disc_out = discriminator(src_sentence.cuda(), fake_sentence.cuda()) # 64 X 1
+            
+            d_loss = d_criterion(disc_out.squeeze(1), fake_labels)
 
-                acc = torch.sum(torch.round(disc_out).squeeze(1) == fake_labels).float() / len(fake_labels)
+            acc = torch.sum(torch.round(disc_out).squeeze(1) == fake_labels).float() / len(fake_labels)
 
-                d_logging_meters['train_acc'].update(acc)
-                d_logging_meters['train_loss'].update(d_loss)
-                logging.debug(f"D training loss {d_logging_meters['train_loss'].avg:.3f}, acc {d_logging_meters['train_acc'].avg:.3f} at batch {i}")
-                d_optimizer.zero_grad()
-                d_loss.backward()
-                d_optimizer.step()
+            d_logging_meters['train_acc'].update(acc)
+            d_logging_meters['train_loss'].update(d_loss)
+            logging.debug(f"D training loss {d_logging_meters['train_loss'].avg:.3f}, acc {d_logging_meters['train_acc'].avg:.3f} at batch {i}")
+            print(f"D training loss {d_logging_meters['train_loss'].avg:.3f}, acc {d_logging_meters['train_acc'].avg:.3f} at batch {i}")
+            d_optimizer.zero_grad()
+            d_loss.backward()
+            d_optimizer.step()
+
+            if i >= 5:
+                print("\n\n==========\nCOMPLETED 5 BATCHES OF ADVERSERIAL TRAINING\n====================\n")
+                return

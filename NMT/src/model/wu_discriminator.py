@@ -13,9 +13,10 @@ class Discriminator(nn.Module):
         self.fixed_max_len = args.fixed_max_len
         self.use_cuda = use_cuda
 
+        print(f"\n\n\n attempted : {args.encoder_embed_dim}, {args.decoder_embed_dim}")
 
-        self.embed_src_tokens = Embedding(len(src_dict), args.encoder_embed_dim, src_dict.pad())
-        self.embed_trg_tokens = Embedding(len(dst_dict), args.decoder_embed_dim, dst_dict.pad())
+        self.embed_src_tokens = Embedding(len(src_dict), 1000, src_dict.pad())
+        self.embed_trg_tokens = Embedding(len(dst_dict), 1000, dst_dict.pad())
 
 
         self.conv1 = nn.Sequential(
@@ -42,7 +43,7 @@ class Discriminator(nn.Module):
 
         self.classifier = nn.Sequential(
             nn.Dropout(),
-            Linear(256 * 12 * 12, 20),
+            Linear(16384, 20),
             nn.ReLU(),
             nn.Dropout(),
             Linear(20, 20),
@@ -69,6 +70,8 @@ class Discriminator(nn.Module):
         out = out.permute(0, 2, 3, 1)
         
         out = out.contiguous().view(batch_size, -1)
+
+        #print(f"\n\n=======\n\n====\n\n=\nin discriminator: {out.shape}")
         
         out = torch.sigmoid(self.classifier(out))
 
